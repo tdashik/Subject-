@@ -1,0 +1,6 @@
+---
+title: "Lab1"
+format: md
+output-file: README.md
+---
+

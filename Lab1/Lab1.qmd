@@ -1,6 +1,6 @@
 ---
 title: "Lab1"
-author: "tdashik"
+author: daria.toikina@yandex.ru
 date: "2025-11-08"
 format: md
 output-file: README.md

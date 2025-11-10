@@ -1,0 +1,8 @@
+---
+title: "Lab2"
+author: daria.toikina@yandex.ru
+date: "2025-11-10"
+format: md
+output-file: README.md
+---
+

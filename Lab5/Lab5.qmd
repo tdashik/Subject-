@@ -1,0 +1,289 @@
+---
+title: "Lab5"
+author: daria.toikina@yandex.ru
+date: "2025-11-10"
+format: md
+output-file: README.md
+---
+
+## Цель работы
+
+1\. Получить знания о методах исследования радиоэлектронной обстановки.
+
+2\. Составить представление о механизмах работы Wi-Fi сетей на канальном и сетевом уровне модели OSI.
+
+3\. Зекрепить практические навыки использования языка программирования R для обработки данных
+
+4\. Закрепить знания основных функций обработки данных экосистемы tidyverse языка R
+
+## Задание
+
+Используя программный пакет dplyr языка программирования R провести анализ журналов и ответить на вопросы.
+
+## Подготовка данных  
+
+### Загрузка библиотек
+```
+library(tidyverse)
+library(readr)
+library(dbplyr)
+```
+
+### Загрузка фалй 
+```
+data_url <- "https://storage.yandexcloud.net/dataset.ctfsec/P2_wifi_data.csv"
+```
+### Скачиваем файл
+```
+ download.file(data_url, "wifi_data.csv", mode = "wb")
+trying URL 'https://storage.yandexcloud.net/dataset.ctfsec/P2_wifi_data.csv'
+Content type 'text/csv' length 1203533 bytes (1.1 MB)
+==================================================
+downloaded 1.1 MB
+```
+### Чтение данных
+```
+raw_data <- read.csv("wifi_data.csv", skip = 1, header = FALSE, stringsAsFactors = FALSE)
+```
+
+### Посмотр
+```
+glimpse(raw_data)
+Rows: 12,250
+Columns: 15
+$ X1  <chr> "BSSID", "BE:F1:71:D5:17:8B", "6E:C7:EC:16:DA:1A", "9A:75:A8:B9:04:1E", "4A:EC:1E:DB:BF:95", "D2:6D:…
+$ X2  <chr> "First time seen", "2023-07-28 09:13:03", "2023-07-28 09:13:03", "2023-07-28 09:13:03", "2023-07-28 …
+$ X3  <chr> "Last time seen", "2023-07-28 11:50:50", "2023-07-28 11:55:12", "2023-07-28 11:53:31", "2023-07-28 1…
+$ X4  <chr> "channel", "1", "1", "1", "7", "6", "6", "11", "11", "11", "1", "6", "14", "11", "11", "6", "6", "6"…
+$ X5  <chr> "Speed", "195", "130", "360", "360", "130", "130", "195", "130", "130", "195", "180", "65", "130", "…
+$ X6  <chr> "Privacy", "WPA2", "WPA2", "WPA2", "WPA2", "WPA2", "OPN", "WPA2", "WPA2", "WPA2", "WPA2", "WPA2", "W…
+$ X7  <chr> "Cipher", "CCMP", "CCMP", "CCMP", "CCMP", "CCMP", NA, "CCMP", "CCMP", "CCMP", "CCMP", "CCMP", "CCMP"…
+$ X8  <chr> "Authentication", "PSK", "PSK", "PSK", "PSK", "PSK", NA, "PSK", "PSK", "PSK", "PSK", "PSK", "PSK", "…
+$ X9  <chr> "Power", "-30", "-30", "-68", "-37", "-57", "-63", "-27", "-38", "-38", "-66", "-42", "-62", "-73", …
+$ X10 <chr> "# beacons", "846", "750", "694", "510", "647", "251", "1647", "1251", "704", "617", "1390", "142", …
+$ X11 <chr> "# IV", "504", "116", "26", "21", "6", "3430", "80", "11", "0", "0", "86", "0", "0", "0", "907", "0"…
+$ X12 <chr> "LAN IP", "0.  0.  0.  0", "0.  0.  0.  0", "0.  0.  0.  0", "0.  0.  0.  0", "0.  0.  0.  0", "172.…
+$ X13 <chr> "ID-length", "12", "4", "2", "14", "25", "13", "12", "13", "24", "12", "10", "0", "24", "24", "12", …
+$ X14 <chr> "ESSID", "C322U13 3965", "Cnet", "KC", "POCO X5 Pro 5G", NA, "MIREA_HOTSPOT", "C322U21 0566", "Andro…
+$ X15 <chr> "Key", NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, N…
+```
+
+## Разделение на два датасета
+
+### Определение строк для каждого типа данных
+```
+> ap_rows <- which(raw_data$X1 == "BSSID")
+> client_rows <- which(raw_data$X1 == "Station MAC")
+```
+
+### Создание датасета для точек доступа
+```
+> ap_data <- raw_data %>%  slice((ap_rows[1] + 1):(client_rows[1] - 1)) %>% select(1:14) %>% `colnames<-`(c("BSSID", "First_time", "Last_time", "channel", "speed",  "privacy", "cipher", "authentication", "power",  "beacons", "IV", "LAN_IP", "ID_length", "ESSID")) %>%  filter(!is.na(BSSID)) %>%  mutate(First_time = as.POSIXct(First_time, format = "%Y-%m-%d %H:%M:%S"),  Last_time = as.POSIXct(Last_time, format = "%Y-%m-%d %H:%M:%S"), channel = as.numeric(channel), speed = as.numeric(speed), power = as.numeric(power), beacons = as.numeric(beacons), IV = as.numeric(IV) )
+```
+
+### Создание датасета для клиентов
+```
+client_data <- raw_data %>%  slice((client_rows[1] + 1):n()) %>% select(1:7) %>%
+ rename( Station_MAC = X1, First_time = X2, Last_time = X3, power = X4,packets = X5, BSSID = X6, Probed_ESSIDs = X7 ) %>% filter(!is.na(Station_MAC)) %>% mutate( First_time = as.POSIXct(First_time, format = "%Y-%m-%d %H:%M:%S"), Last_time = as.POSIXct(Last_time, format = "%Y-%m-%d %H:%M:%S"), power = as.numeric(power), packets = as.numeric(packets) )
+```
+
+### Проверка результатов
+```
+> glimpse(ap_data)
+Rows: 167
+Columns: 14
+$ BSSID          <chr> "BE:F1:71:D5:17:8B", "6E:C7:EC:16:DA:1A", "9A:75:A8:B9:04:1E", "4A:EC:1E:DB:BF:95", "D2:6…
+$ First_time     <dttm> 2023-07-28 09:13:03, 2023-07-28 09:13:03, 2023-07-28 09:13:03, 2023-07-28 09:13:03, 2023…
+$ Last_time      <dttm> 2023-07-28 11:50:50, 2023-07-28 11:55:12, 2023-07-28 11:53:31, 2023-07-28 11:04:01, 2023…
+$ channel        <dbl> 1, 1, 1, 7, 6, 6, 11, 11, 11, 1, 6, 14, 11, 11, 6, 6, 6, 6, 44, 1, 1, 1, 3, 11, 6, 6, 14,…
+$ speed          <dbl> 195, 130, 360, 360, 130, 130, 195, 130, 130, 195, 180, 65, 130, 130, 130, 130, 65, -1, -1…
+$ privacy        <chr> "WPA2", "WPA2", "WPA2", "WPA2", "WPA2", "OPN", "WPA2", "WPA2", "WPA2", "WPA2", "WPA2", "W…
+$ cipher         <chr> "CCMP", "CCMP", "CCMP", "CCMP", "CCMP", NA, "CCMP", "CCMP", "CCMP", "CCMP", "CCMP", "CCMP…
+$ authentication <chr> "PSK", "PSK", "PSK", "PSK", "PSK", NA, "PSK", "PSK", "PSK", "PSK", "PSK", "PSK", "PSK", "…
+$ power          <dbl> -30, -30, -68, -37, -57, -63, -27, -38, -38, -66, -42, -62, -73, -69, -63, -63, -51, -1, …
+$ beacons        <dbl> 846, 750, 694, 510, 647, 251, 1647, 1251, 704, 617, 1390, 142, 28, 112, 260, 279, 248, 0,…
+$ IV             <dbl> 504, 116, 26, 21, 6, 3430, 80, 11, 0, 0, 86, 0, 0, 0, 907, 0, 806, 3, 5, 33, 0, 0, 41, 30…
+$ LAN_IP         <chr> "0.  0.  0.  0", "0.  0.  0.  0", "0.  0.  0.  0", "0.  0.  0.  0", "0.  0.  0.  0", "172…
+$ ID_length      <chr> "12", "4", "2", "14", "25", "13", "12", "13", "24", "12", "10", "0", "24", "24", "12", "0…
+$ ESSID          <chr> "C322U13 3965", "Cnet", "KC", "POCO X5 Pro 5G", NA, "MIREA_HOTSPOT", "C322U21 0566", "And…
+> glimpse(client_data)
+Rows: 12,081
+Columns: 7
+$ Station_MAC   <chr> "CA:66:3B:8F:56:DD", "96:35:2D:3D:85:E6", "5C:3A:45:9E:1A:7B", "C0:E4:34:D8:E7:E5", "5E:8E…
+$ First_time    <dttm> 2023-07-28 09:13:03, 2023-07-28 09:13:03, 2023-07-28 09:13:03, 2023-07-28 09:13:03, 2023-…
+$ Last_time     <dttm> 2023-07-28 10:59:44, 2023-07-28 09:13:03, 2023-07-28 11:51:54, 2023-07-28 11:53:16, 2023-…
+$ power         <dbl> -33, -65, -39, -61, -53, -43, -31, -71, -74, -65, -45, -65, -49, -1, -67, -37, -69, -55, -…
+$ packets       <dbl> 858, 4, 432, 958, 1, 344, 163, 3, 115, 437, 265, 77, 7, 71, 1, 125, 2245, 4096, 849, 179, …
+$ BSSID         <chr> "BE:F1:71:D5:17:8B", "(not associated)", "BE:F1:71:D6:10:D7", "BE:F1:71:D5:17:8B", "(not a…
+$ Probed_ESSIDs <chr> "C322U13 3965", "IT2 Wireless", "C322U21 0566", "C322U13 3965", NA, NA, "C322U06 5179", NA…
+```
+
+## Анализ точки доступа
+
+### Определить небезопасные точки доступа (без шифрования – OPN)
+```
+unsafe_ap <- ap_data %>% filter(privacy == "OPN") %>% select(BSSID, ESSID, privacy, power)
+> print("Небезопасные точки доступа (OPN):")
+[1] "Небезопасные точки доступа (OPN):"
+> unsafe_ap
+# A tibble: 42 × 4
+   BSSID             ESSID         privacy power
+   <chr>             <chr>         <chr>   <dbl>
+ 1 E8:28:C1:DC:B2:52 MIREA_HOTSPOT OPN       -63
+ 2 E8:28:C1:DC:B2:50 MIREA_GUESTS  OPN       -63
+ 3 E8:28:C1:DC:B2:51 NA            OPN       -63
+ 4 E8:28:C1:DC:FF:F2 NA            OPN        -1
+ 5 00:25:00:FF:94:73 NA            OPN        -1
+ 6 E8:28:C1:DD:04:52 MIREA_HOTSPOT OPN       -67
+ 7 E8:28:C1:DE:74:31 NA            OPN       -82
+ 8 E8:28:C1:DE:74:32 MIREA_HOTSPOT OPN       -69
+ 9 E8:28:C1:DC:C8:32 MIREA_HOTSPOT OPN       -69
+10 E8:28:C1:DD:04:50 MIREA_GUESTS  OPN       -78
+# ℹ 32 more rows
+# ℹ Use `print(n = ...)` to see more rows
+```
+
+### Определить производителя для каждого обнаруженного устройства
+
+#### Создаем локальную базу OUI на основе common MAC prefixes
+```
+ oui_database <- tribble(
++     ~OUI, ~Manufacturer,
++     "00-1A-11", "Cisco-Linksys",
++     "00-25-00", "Cisco",
++     "00-26-B0", "Apple",
++     "00-50-F2", "Microsoft",
++     "00-1B-63", "Intel",
++     "00-1D-0F", "Samsung",
++     "00-23-D0", "Huawei",
++     "00-26-5A", "TP-LINK",
++     "00-19-5B", "Netgear",
++     "00-21-6A", "ASUSTek",
++     "00-0C-29", "VMware",
++     "00-1E-65", "D-Link",
++     "00-24-01", "Raspberry Pi",
++     "00-1C-B3", "Belkin",
++     "00-22-5F", "LG",
++     "00-0F-E2", "Motorola",
++     "00-12-17", "Lenovo",
++     "00-13-E8", "Sony",
++     "00-15-A0", "Google",
++     "00-17-9A", "Nokia",
++     "00-18-4D", "ZTE",
++     "00-1A-2B", "HTC",
++     "00-1B-98", "Toshiba",
++     "00-1C-62", "Acer",
++     "00-1D-72", "Ericsson",
++     "00-1E-3B", "Alcatel",
++     "00-1F-3A", "Dell",
++     "00-21-19", "HP",
++     "00-22-64", "Xiaomi",
++     "00-23-8E", "LG",
++     "00-24-36", "RIM",
++     "00-25-56", "Siemens",
++     "00-26-4A", "Brocade",
++     "00-27-19", "Juniper",
++     "00-50-43", "Sony"
++ )
+```
+
+#### Функция для извлечения OUI из MAC-адреса
+```
+extract_oui <- function(mac) {
++     clean_mac <- str_replace_all(mac, "[: -]", "")
++     oui <- str_sub(clean_mac, 1, 6) %>% toupper()
++     paste0(str_sub(oui, 1, 2), "-", str_sub(oui, 3, 4), "-", str_sub(oui, 5, 6))
++ }
+```
+
+#### Функция для поиска производителя
+```
+find_manufacturer <- function(mac) {
++     oui <- extract_oui(mac)
++     manufacturer <- oui_database %>% 
++         filter(OUI == oui) %>% 
++         pull(Manufacturer)
++     
++     if (length(manufacturer) == 0) {
++         return("Unknown")
++     } else {
++         return(manufacturer)
++     }
++ }
+```
+
+#### Применяем к точкам доступа
+```
+ap_with_manufacturers <- ap_data %>%
++     mutate(
++         OUI = map_chr(BSSID, extract_oui),
++         Manufacturer = map_chr(BSSID, find_manufacturer)
++     )
+```
+
+#### Просмотр результатов
+```
+print("Производители точек доступа:")
+[1] "Производители точек доступа:"
+> ap_with_manufacturers %>%
++     count(Manufacturer) %>%
++     arrange(desc(n)) %>%
++     print(n = 20)
+# A tibble: 2 × 2
+  Manufacturer     n
+  <chr>        <int>
+1 Unknown        166
+2 Cisco            1
+```
+
+### Выявить устройства, использующие последнюю версию протокола шифрования WPA3, и названия точек доступа, реализованных на этих устройствах
+```
+wpa3_analysis <- ap_with_manufacturers %>% filter(str_detect(authentication, "WPA3") | str_detect(privacy, "WPA3")) %>% select(BSSID, ESSID, Manufacturer, privacy, authentication, power, speed)
+print("Устройства с поддержкой WPA3:")
+[1] "Устройства с поддержкой WPA3:"
+> wpa3_analysis
+# A tibble: 8 × 7
+  BSSID             ESSID                Manufacturer privacy   authentication power speed
+  <chr>             <chr>                <chr>        <chr>     <chr>          <dbl> <dbl>
+1 26:20:53:0C:98:E8 NA                   Unknown      WPA3 WPA2 SAE PSK          -85   866
+2 A2:FE:FF:B8:9B:C9 Christie’s           Unknown      WPA3 WPA2 SAE PSK          -70   130
+3 96:FF:FC:91:EF:64 NA                   Unknown      WPA3 WPA2 SAE PSK          -85   866
+4 CE:48:E7:86:4E:33 iPhone (Анастасия)   Unknown      WPA3 WPA2 SAE PSK          -65   866
+5 8E:1F:94:96:DA:FD iPhone (Анастасия)   Unknown      WPA3 WPA2 SAE PSK          -67   866
+6 BE:FD:EF:18:92:44 Димасик              Unknown      WPA3 WPA2 SAE PSK          -64   130
+7 3A:DA:00:F9:0C:02 iPhone XS Max 🦊🐱🦊 Unknown      WPA3 WPA2 SAE PSK          -65   130
+8 76:C5:A0:70:08:96 NA                   Unknown      WPA3 WPA2 SAE PSK          -52   130
+```
+
+### Отсортировать точки доступа по интервалу времени, в течение которого они находились на связи, по убыванию.
+```
+
+```
+
+
+## Анализ данных клиента
+
+### Определить производителя для каждого обнаруженного устройства
+
+####  Применяем к клиентам
+```
+client_with_manufacturers <- client_data %>%
++     mutate(
++         OUI = map_chr(Station_MAC, extract_oui),
++         Manufacturer = map_chr(Station_MAC, find_manufacturer)
++     )
+```
+
+#### Просмотр результатов
+```
+print("Производители клиентских устройств:")
+[1] "Производители клиентских устройств:"
+> client_with_manufacturers %>%
++     count(Manufacturer) %>%
++     arrange(desc(n)) %>%
++     print(n = 20)
+# A tibble: 1 × 2
+  Manufacturer     n
+  <chr>        <int>
+1 Unknown      12081
+```

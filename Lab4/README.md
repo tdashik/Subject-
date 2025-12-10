@@ -125,10 +125,9 @@ tidyverse языка R
 
 ### Найдите топ-10 доменов, к которым обращаются пользователи сети и соответственное количество обращений
 
-    top_domains <- dns_data %>% filter(!is.na(query), query != "") %>% count(query, sort = TRUE) %>%  head(10)
-    > print("Топ-10 доменов по количеству обращений:")
-    [1] "Топ-10 доменов по количеству обращений:"
-    > top_domains %>% print()
+    top_domains <- dns_data %>% filter(!is.na(query), query != "", query != "-") %>% count(query, sort = TRUE) %>% head(10)
+    print("Топ-10 доменов по количеству обращений:")
+    print(top_domains)
       query      n
     1     1 317087
     2     -   2483
@@ -137,15 +136,28 @@ tidyverse языка R
 
 ### Опеределите базовые статистические характеристики (функция summary() ) интервала времени между последовательными обращениями к топ-10 доменам.
 
-    >analyze_time_intervals <- function(domain_name) { dns_data %>% filter(query == domain_name) %>% arrange(ts) %>% mutate(time_diff = as.numeric(ts - lag(ts))) %>%  pull(time_diff) %>% .[!is.na(.)] %>% summary() }
-    > top_domains_list <- top_domains %>% pull(query)
-    print("Статистика интервалов времени для топ-10 доменов:")
-    [1] "Статистика интервалов времени для топ-10 доменов:"
-    > for(domain in top_domains_list) {
-    +     print(paste("Домен:", domain))
-    +     analyze_time_intervals(domain) %>% print()
-    +     cat("\n")
-    + }
+    analyze_time_intervals <- function(domain_name) {
+      intervals <- dns_data %>%
+        filter(query == domain_name) %>%
+        arrange(ts) %>%
+        mutate(time_diff = as.numeric(difftime(ts, lag(ts), units = "secs"))) %>%
+        pull(time_diff) %>%
+        .[!is.na(.)]
+      
+      if (length(intervals) > 0) {
+        return(summary(intervals))
+      } else {
+        return("Недостаточно данных")
+      }
+    }
+
+    print("Статистика интервалов времени для топ-3 доменов:")
+    for(i in 1:min(3, nrow(top_domains))) {
+      domain <- top_domains$query[i]
+      print(paste("Домен:", domain))
+      print(analyze_time_intervals(domain))
+      cat("\n")
+    }
     [1] "Домен: 1"
          Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
         0.000     0.000     0.010     0.278     0.120 49669.280 

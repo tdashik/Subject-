@@ -121,22 +121,25 @@ select(name, height)
 
 #### 9. Найти средний возраст персонажей каждой расы вселенной Звездных войн.
 
-    starwars %>% mutate(age = current_year - birth_year) %>% group_by(species) %>% summarise(mean_age = mean(age, na.rm = TRUE)) %>%  arrange(desc(mean_age))
-    # A tibble: 38 × 2
-       species      mean_age
-       <chr>           <dbl>
-     1 Ewok             92  
-     2 Kel Dor          78  
-     3 Mon Calamari     59  
-     4 Rodian           56  
-     5 Twi'lek          52  
-     6 Mirialan         51  
-     7 Gungan           48  
-     8 Trandoshan       47  
-     9 Droid            46.7
-    10 Human            46.3
-    # ℹ 28 more rows
-    # ℹ Use `print(n = ...)` to see more rows
+    starwars %>% group_by(species) %>% filter(!is.na(birth_year)) %>% summarise(mean_age = mean(birth_year, na.rm = TRUE)) %>% arrange(desc(mean_age))
+    # A tibble: 15 × 2
+       species        mean_age
+       <chr>             <dbl>
+     1 Yoda's species    896  
+     2 Hutt              600  
+     3 Wookiee           200  
+     4 Cerean             92  
+     5 Zabrak             54  
+     6 Human              53.7
+     7 Droid              53.3
+     8 Trandoshan         53  
+     9 Gungan             52  
+    10 Mirialan           49  
+    11 Twi'lek            48  
+    12 Rodian             44  
+    13 Mon Calamari       41  
+    14 Kel Dor            22  
+    15 Ewok                8  
 
 #### 10. Найти самый распространенный цвет глаз персонажей вселенной Звездных войн.
 

@@ -121,7 +121,8 @@ group_by()
 
 ### 10. Какая средняя температура воздуха была в сентябре в аэропорту John F Kennedy Intl (в градусах Цельсия).
 
-     A tibble: 1 × 1
+    weather %>% filter(origin == "JFK", month == 9) %>% summarise(mean_temp_c = mean((temp - 32) * 5/9, na.rm = TRUE))
+    A tibble: 1 × 1
       `mean((temp - 32) * 5/9, na.rm = TRUE)`
       <dbl>
       19.4

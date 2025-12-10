@@ -1,0 +1,334 @@
+---
+title: "Lab6"
+author: daria.toikina@yandex.ru
+date: "2025-12-8"
+format: md
+output-file: README.md
+---
+
+# Цель работы
+1\. Закрепить навыки исследования данных журнала Windows Active Directory
+
+2\. Изучить структуру журнала системы Windows Active Directory
+
+3\. Зекрепить практические навыки использования языка программирования R для
+обработки данных
+
+4\. Закрепить знания основных функций обработки данных экосистемы tidyverse
+языка R
+
+## Установка и загрузка необходимых библиотек
+```
+library(dplyr)     
+library(tidyr)      
+library(jsonlite)  
+library(xml2)       
+library(rvest)     
+library(stringr)    
+```
+
+## Подготовка данных
+```
+dataset_url <- "https://storage.yandexcloud.net/iamcth-data/dataset.tar.gz"
+temp_archive <- "security_logs.tar.gz"
+
+ download_result <- tryCatch({
+     download.file(dataset_url, temp_archive, mode = "wb", quiet = TRUE)
+     cat("✓ Архив успешно загружен\n")
+ }, error = function(e) {
+     cat("✗ Ошибка при загрузке:", e$message, "\n")
+     stop("Не удалось загрузить данные")
+ }
+
+ download_result <- tryCatch({
+     download.file(dataset_url, temp_archive, mode = "wb", quiet = TRUE)
+     cat("✓ Архив успешно загружен\n")
+ }, error = function(e) {
+     cat("✗ Ошибка при загрузке:", e$message, "\n")
+     stop("Не удалось загрузить данные")
+ })
+✓ Архив успешно загружен
+ 
+ cat("Распаковка архива...\n")
+Распаковка архива...
+ extract_dir <- "extracted_logs"
+ dir.create(extract_dir, showWarnings = FALSE)
+ untar(temp_archive, exdir = extract_dir)
+ 
+ cat("Обработка файла журналов:", basename(log_files[1]), "\n")
+Обработка файла журналов: caldera_attack_evals_round1_day1_2019-10-20201108.json 
+ log_data <- tryCatch({
+     con <- file(log_files[1], "r")
+     data <- stream_in(con)
+     close(con)
+     cat(" Данные успешно импортированы\n")
+     data
+ }, error = function(e) {
+     cat("✗ Ошибка при чтении JSON:", e$message, "\n")
+     cat("Попытка альтернативного метода загрузки...\n")
+     data <- read_lines(log_files[1]) %>%
+         paste(collapse = "") %>%
+         fromJSON()
+     data
+ })
+ Imported 101904 records. Simplifying...
+ Данные успешно импортированы
+```
+
+## Загрузка справочника событий WINDOWS
+```
+reference_url <- "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/appendix-l--events-to-monitor"
+html_content <- read_html(reference_url)
+event_table <- html_table(html_content)[[1]]
+```
+
+## Привести датасеты в вид “аккуратных данных” преобразовать типы столбцов в соответствии с типом данных
+```
+flatten_data <- function(df) {
+  cat("Начало преобразования...\n")
+    result <- as_tibble(df)
+    for (col_name in names(result)) {
+    col_data <- result[[col_name]]
+    if (is.list(col_data) || is.data.frame(col_data)) {
+      cat("Раскрываем столбец:", col_name, "\n")
+      tryCatch({
+        if (is.list(col_data) && length(col_data) == 1 && is.data.frame(col_data[[1]])) {
+          nested_df <- col_data[[1]]
+        } else {
+          nested_df <- as.data.frame(col_data)
+        }
+        if (ncol(nested_df) > 0) {
+          colnames(nested_df) <- paste(col_name, colnames(nested_df), sep = "_")
+          result[[col_name]] <- NULL
+          result <- bind_cols(result, nested_df)
+          cat("Успешно раскрыто в", ncol(nested_df), "столбцов\n")
+        }
+      }, error = function(e) {
+        cat("Ошибка при раскрытии:", e$message, "\n")
+      })
+    }
+  }
+```
+## Просмотрите общую структуру данных с помощью функции glimpse()
+```
+> glimpse(tidy_data_simple)
+Rows: 101,904
+Columns: 20
+$ `@timestamp`         <chr> "2019-10-20T20:11:06.937Z", "2019-10-20T20:11:07.101Z", "2019-10-20T20:11:09.0…
+$ event_created        <chr> "2019-10-20T20:11:09.988Z", "2019-10-20T20:11:09.988Z", "2019-10-20T20:11:11.9…
+$ event_code           <int> 4703, 4673, 10, 10, 10, 10, 11, 10, 10, 10, 10, 7, 7, 7, 4689, 10, 5, 4703, 10…
+$ event_action         <chr> "Token Right Adjusted Events", "Sensitive Privilege Use", "Process accessed (r…
+```
+
+# Анализ
+## 1. Раскройте датафрейм избавившись от вложенных датафреймов. Для обнаружения таких можно использовать функцию dplyr::glimpse(), а для раскрытия вложенности – tidyr::unnest(). Обратите внимание, что при раскрытии теряются внешние названия колонок – это можно предотвратить если использовать параметр tidyr::unnest(..., names_sep = ).
+
+### Какие колонки содержат вложенные датафреймы или списки
+```
+nested_columns <- list(
+  dataframes = character(),
+  lists = character(),
+  other_nested = character()
+)
+
+for (col_name in names(tidy_data)) {
+  col_data <- tidy_data[[col_name]]
+  col_type <- class(col_data)[1]
+  
+  if (is.data.frame(col_data)) {
+    nested_columns$dataframes <- c(nested_columns$dataframes, col_name)
+    cat("   •", col_name, "→ вложенный датафрейм (", ncol(col_data), "столбцов)\n")
+  } else if (is.list(col_data) && !is.data.frame(col_data)) {
+    nested_columns$lists <- c(nested_columns$lists, col_name)
+    
+    if (length(col_data) > 0) {
+      first_elem <- col_data[[1]]
+      elem_type <- if (!is.null(first_elem)) class(first_elem)[1] else "NULL"
+      cat( col_name, "→ список элементов типа", elem_type, "\n")
+    } else {
+      cat( col_name, "→ пустой список\n")
+    }
+  } else if (col_type %in% c("tbl_df", "tbl", "data.table")) {
+    nested_columns$other_nested <- c(nested_columns$other_nested, col_name)
+    cat( col_name, "→ объект типа", col_type, "\n")
+  }
+}
+
+winlog_event_data → вложенный датафрейм ( 234 столбцов)
+   winlog_process → вложенный датафрейм ( 2 столбцов)
+   winlog_keywords → список элементов типа character 
+   winlog_user → вложенный датафрейм ( 4 столбцов)
+   winlog_user_data → вложенный датафрейм ( 30 столбцов)
+   
+cat("\nВсего вложенных структур:", 
+    length(nested_columns$dataframes) + 
+    length(nested_columns$lists) + 
+    length(nested_columns$other_nested), "\n")
+    
+Всего вложенных структур: 5 
+```
+
+### Раскроем вложенные датафреймы с помощью unnest()
+```
+unested_data <- tidy_data
+
+safe_unnest <- function(df, cols_to_unnest, names_sep = "_") {
+  result <- df
+  
+  for (col in cols_to_unnest) {
+    if (col %in% names(result)) {
+      cat("   Раскрываем колонку:", col, "\n")
+      
+      tryCatch({
+        result <- result %>%
+          tidyr::unnest(
+            cols = all_of(col),
+            names_sep = names_sep,
+            keep_empty = TRUE
+          )
+        cat(" Успешно раскрыто\n")
+      }, error = function(e) {
+        cat(" Ошибка:", e$message, "\n")
+        
+        if (is.data.frame(df[[col]])) {
+          nested_df <- as.data.frame(df[[col]])
+          
+          if (ncol(nested_df) > 0) {
+            colnames(nested_df) <- paste(col, colnames(nested_df), sep = names_sep)
+            
+            result[[col]] <- NULL
+            
+            result <- bind_cols(result, nested_df)
+            cat("     ✓ Раскрыто в", ncol(nested_df), "столбцов\n")
+          }
+        }
+      })
+    }
+  }
+  
+  return(result)
+}
+
+if (length(nested_columns$dataframes) > 0) {
+  unested_data <- safe_unnest(unested_data, nested_columns$dataframes, names_sep = "_")
+} else {
+  cat("  Вложенные датафреймы не обнаружены\n")
+}
+Раскрываем колонку: winlog_event_data 
+      Успешно раскрыто
+   Раскрываем колонку: winlog_process 
+      Успешно раскрыто
+   Раскрываем колонку: winlog_user 
+      Успешно раскрыто
+   Раскрываем колонку: winlog_user_data 
+      Успешно раскрыто
+
+```
+
+### Раскрываем списки 
+```
+if (length(nested_columns$lists) > 0) {
+  for (list_col in nested_columns$lists) {
+    cat("   Обрабатываем список:", list_col, "\n")
+    
+    list_data <- unested_data[[list_col]]
+    
+    if (length(list_data) > 0 && !all(sapply(list_data, is.null))) {
+      tryCatch({
+        unested_data <- unested_data %>%
+          tidyr::unnest_wider(
+            cols = all_of(list_col),
+            names_sep = "_"
+          )
+        cat(" Список успешно раскрыт\n")
+      }, error = function(e) {
+        cat("  Не удалось раскрыть список:", e$message, "\n")
+        
+        cat("     Преобразуем в текстовый формат...\n")
+        unested_data[[list_col]] <- sapply(list_data, function(x) {
+          if (is.null(x)) NA_character_
+          else if (is.character(x)) paste(x, collapse = "; ")
+          else as.character(x)
+        })
+      })
+    } else {
+      cat(" Список пустой или содержит только NULL, удаляем...\n")
+      unested_data[[list_col]] <- NULL
+    }
+  }
+} else {
+  cat("  Списков для обработки не обнаружено\n")
+}
+
+cat(" Было столбцов:", ncol(tidy_data), "\n")
+   Было столбцов: 19 
+> cat(" Стало столбцов:", ncol(unested_data), "\n")
+   Стало столбцов: 285 
+> cat(" Добавлено столбцов:", ncol(unested_data) - ncol(tidy_data), "\n")
+   Добавлено столбцов: 266 
+```
+
+### Минимизируйте количество колонок в датафрейме – уберите колоки с единственным значением параметра.
+```
+minimized_simple <- unested_data %>%
+  select(where(~ n_distinct(., na.rm = TRUE) > 1))
+
+cat("Осталось колонок:", ncol(minimized_simple), "\n")
+    Осталось колонок: 179
+cat("Удалено:", ncol(unested_data) - ncol(minimized_simple), "\n\n")
+    Удалено: 106 
+```
+
+### Какое количество хостов представлено в данном датасете?
+```
+host_count <- tidy_data %>%
+     distinct(winlog_computer_name) %>%
+     nrow()
+ 
+ cat("Количество хостов:", host_count, "\n")
+Количество хостов: 5 
+```
+
+### Подготовьте датафрейм с расшифровкой Windows Event_ID, приведите типы данных к типу их значений.
+```
+suppressWarnings({
++     windows_event_df <- event_table %>%
++         rename(
++             winlog_event_id = `Current Windows Event ID`,
++             event_description = `Event Summary`
++         ) %>%
++         mutate(
++             winlog_event_id = as.integer(winlog_event_id),
++             event_description = as.character(event_description)
++         )
++ })
+
+> cat("✓ Справочник создан (предупреждение обработано)\n")
+✓ Справочник создан (предупреждение обработано)
+> cat("Событий:", nrow(windows_event_df), "\n")
+Событий: 381 
+> cat("Тип winlog_event_id:", class(windows_event_df$winlog_event_id), "\n")
+Тип winlog_event_id: integer 
+```
+
+### Есть ли в логе события с высоким и средним уровнем значимости? Сколько их?
+```
+ cat("Уровни в данных:\n")
+Уровни в данных:
+ print(table(tidy_data$log_level))
+
+      error information     verbose     warning 
+          4       78473       23205         222 
+ cat("\n")
+
+
+ high_count <- tidy_data %>% filter(log_level == "error") %>% nrow()
+ medium_count <- tidy_data %>% filter(log_level == "warning") %>% nrow()
+
+ cat("Событий высокого уровня (error):", high_count, "\n")
+Событий высокого уровня (error): 4 
+ cat("Событий среднего уровня (warning):", medium_count, "\n")
+Событий среднего уровня (warning): 222 
+ cat("Всего:", high_count + medium_count, "\n")
+Всего: 226 
+```

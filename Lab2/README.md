@@ -105,65 +105,16 @@ select(name, height)
 #### 8. Найти 10 самых “вытянутых” персонажей. “Вытянутость” оценить по отношению массы (mass) к росту (height) персонажей.
 
     starwars %>% mutate(stretch_ratio = mass / height) %>% arrange(desc(stretch_ratio)) %>% select(name, mass, height, stretch_ratio) %>% head(10)
-    # A tibble: 10 × 4
-       name                   mass height stretch_ratio
-       <chr>                 <dbl>  <int>         <dbl>
-     1 Jabba Desilijic Tiure  1358    175         7.76 
-     2 Grievous                159    216         0.736
-     3 IG-88                   140    200         0.7  
-     4 Owen Lars               120    178         0.674
-     5 Darth Vader             136    202         0.673
-     6 Jek Tono Porkins        110    180         0.611
-     7 Bossk                   113    190         0.595
-     8 Tarfful                 136    234         0.581
-     9 Dexter Jettster         102    198         0.515
-    10 Chewbacca               112    228         0.491
 
 #### 9. Найти средний возраст персонажей каждой расы вселенной Звездных войн.
 
-    starwars %>% group_by(species) %>% filter(!is.na(birth_year)) %>% summarise(mean_age = mean(birth_year, na.rm = TRUE)) %>% arrange(desc(mean_age))
-    # A tibble: 15 × 2
-       species        mean_age
-       <chr>             <dbl>
-     1 Yoda's species    896  
-     2 Hutt              600  
-     3 Wookiee           200  
-     4 Cerean             92  
-     5 Zabrak             54  
-     6 Human              53.7
-     7 Droid              53.3
-     8 Trandoshan         53  
-     9 Gungan             52  
-    10 Mirialan           49  
-    11 Twi'lek            48  
-    12 Rodian             44  
-    13 Mon Calamari       41  
-    14 Kel Dor            22  
-    15 Ewok                8  
+    starwars %>% group_by(species) %>% filter(!is.na(birth_year)) %>%
+    summarise(mean_age = mean(-birth_year, na.rm = TRUE)) %>% arrange(desc(mean_age))
 
 #### 10. Найти самый распространенный цвет глаз персонажей вселенной Звездных войн.
 
     starwars %>% count(eye_color, sort = TRUE) %>% head(1)
-    # A tibble: 1 × 2
-      eye_color     n
-      <chr>     <int>
-    1 brown        21
 
 #### 11. Подсчитать среднюю длину имени в каждой расе вселенной Звездных войн.
 
     starwars %>%  mutate(name_length = nchar(name)) %>% group_by(species) %>% summarise(mean_name_length = mean(name_length, na.rm = TRUE)) %>%  arrange(desc(mean_name_length))
-    # A tibble: 38 × 2
-       species   mean_name_length
-       <chr>                <dbl>
-     1 Ewok                  21  
-     2 Hutt                  21  
-     3 Geonosian             17  
-     4 Besalisk              15  
-     5 Mirialan              14  
-     6 Toong                 14  
-     7 Aleena                12  
-     8 Cerean                12  
-     9 Gungan                11.7
-    10 Human                 11.3
-    # ℹ 28 more rows
-    # ℹ Use `print(n = ...)` to see more rows

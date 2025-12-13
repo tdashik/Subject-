@@ -122,7 +122,7 @@ group_by()
 ### 10. Какая средняя температура воздуха была в сентябре в аэропорту John F Kennedy Intl (в градусах Цельсия).
 
     weather %>% filter(origin == "JFK", month == 9) %>% summarise(mean_temp_c = mean((temp - 32) * 5/9, na.rm = TRUE))
-    A tibble: 1 × 1
+
       `mean((temp - 32) * 5/9, na.rm = TRUE)`
       <dbl>
       19.4
@@ -135,11 +135,4 @@ group_by()
 
 ### 12. Самолеты какой авиакомпании задерживались чаще других в 2013 году?
 
-    flights %>% mutate(delayed = dep_delay > 0 | arr_delay > 0) %>% count(carrier, delayed) %>% group_by(carrier) %>%    mutate(ratio = n/sum(n)) %>% filter(delayed == TRUE) %>% slice_max(ratio, n = 1) %>% left_join(airlines) %>% pull(name)
-    Joining with `by = join_by(carrier)`
-     [1] "Endeavor Air Inc."           "American Airlines Inc."      "Alaska Airlines Inc."       
-     [4] "JetBlue Airways"             "Delta Air Lines Inc."        "ExpressJet Airlines Inc."   
-     [7] "Frontier Airlines Inc."      "AirTran Airways Corporation" "Hawaiian Airlines Inc."     
-    [10] "Envoy Air"                   "SkyWest Airlines Inc."       "United Air Lines Inc."      
-    [13] "US Airways Inc."             "Virgin America"              "Southwest Airlines Co."     
-    [16] "Mesa Airlines Inc."         
+    flights %>% mutate(delayed = dep_delay > 0 | arr_delay > 0) %>% group_by(carrier) %>% summarise(delay_ratio = mean(delayed, na.rm = TRUE)) %>% arrange(desc(delay_ratio)) %>% slice(1) %>% left_join(airlines) %>% pull(name)

@@ -49,251 +49,228 @@ downloaded 6.1 MB
 ### Добавьте пропущенные данные о структуре данных (назначении столбцов)
 
 ```         
-col_names <- c("ts", "uid", "id.orig_h", "id.orig_p", "id.resp_h","id.resp_p", "proto", "trans_id", "rtt", "query",  "qclass", "qclass_name", "qtype", "qtype_name",  "rcode", "rcode_name", "AA", "TC", "RD", "RA", "Z", "answers", "TTLs", "rejected")
-> names(dns_data) <- col_names[1:ncol(dns_data)]
+col_names <- c( "ts", "uid", "id.orig_h", "id.orig_p", "id.resp_h", "id.resp_p", "proto", "trans_id", "query", "unknown1", "qclass", "qclass_name", "qtype", "qtype_name", "rcode", "rcode_name", "AA", "TC", "RD", "RA", "Z", "answers", "TTLs")
 ```
 
 ### Преобразуйте данные в столбцах в нужный формат
 
 ```         
-dns_data <- dns_data %>% mutate( ts = as.POSIXct(ts, origin = "1970-01-01"), id.orig_p = as.integer(id.orig_p), id.resp_p = as.integer(id.resp_p), rtt = as.numeric(rtt) )
+dns_data <- read_tsv( "dns.log", col_names = col_names, col_types = cols(.default = col_character(), ts = col_double(), id.orig_p = col_integer(), id.resp_p = col_integer(), trans_id = col_integer(), qclass_name = col_integer(), qtype_name = col_integer(), AA = col_logical(), TC = col_logical(), RD = col_logical(), RA = col_integer()), na = c("-", "(empty)", ""), comment = "#", show_col_types = FALSE)
+
 ```
 
 ### Просмотрите общую структуру данных с помощью функции glimpse()
 
 ```         
-dns_data %>% glimpse()
-Rows: 320,840
+> glimpse(dns_data)
+Rows: 427,935
 Columns: 23
-$ ts          <dttm> 2012-03-16 16:30:05, 2012-03-16 16:30:15, 2012-03-16 16:30:15, 2012-03-16 16:30:16, 2012-03…
-$ uid         <chr> "CWGtK431H9XuaTN4fi", "C36a282Jljz7BsbGH", "C36a282Jljz7BsbGH", "C36a282Jljz7BsbGH", "C36a28…
-$ id.orig_h   <chr> "192.168.202.100", "192.168.202.76", "192.168.202.76", "192.168.202.76", "192.168.202.76", "…
-$ id.orig_p   <int> 45658, 137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 45658, 45659, 45658, 137,…
-$ id.resp_h   <chr> "192.168.27.203", "192.168.202.255", "192.168.202.255", "192.168.202.255", "192.168.202.255"…
-$ id.resp_p   <int> 137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 137, 5353, 5353, 137, 137, 137, …
-$ proto       <chr> "udp", "udp", "udp", "udp", "udp", "udp", "udp", "udp", "udp", "udp", "udp", "udp", "udp", "…
-$ trans_id    <int> 33008, 57402, 57402, 57402, 57398, 57398, 57398, 62187, 62187, 62187, 62190, 62190, 62190, 0…
-$ rtt         <dbl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, …
-$ query       <chr> "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1…
-$ qclass      <chr> "C_INTERNET", "C_INTERNET", "C_INTERNET", "C_INTERNET", "C_INTERNET", "C_INTERNET", "C_INTER…
-$ qclass_name <chr> "33", "32", "32", "32", "32", "32", "32", "32", "32", "32", "33", "33", "33", "12", "12", "3…
-$ qtype       <chr> "SRV", "NB", "NB", "NB", "NB", "NB", "NB", "NB", "NB", "NB", "SRV", "SRV", "SRV", "PTR", "PT…
-$ qtype_name  <chr> "0", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "0", "-", "-", "-…
-$ rcode       <chr> "NOERROR", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "NOERROR", …
-$ rcode_name  <lgl> FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, F…
-$ AA          <lgl> FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, F…
-$ TC          <lgl> FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FAL…
-$ RD          <lgl> FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, F…
-$ RA          <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,…
-$ Z           <chr> "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-…
-$ answers     <chr> "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-…
-$ TTLs        <lgl> FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, F…
-> 
+$ ts          <dttm> 2012-03-16 12:30:05, 2012-03-16 12:30:15, 2012-03-16 12:30:15, 2012-03-16 12:30:16, 20…
+$ uid         <chr> "CWGtK431H9XuaTN4fi", "C36a282Jljz7BsbGH", "C36a282Jljz7BsbGH", "C36a282Jljz7BsbGH", "C…
 ```
 
 ## Анализ
 
+#### Функция для определения внутренних IP-адресов
+```
+is_internal_ip <- function(ip) { grepl("^10\\.|^192\\.168\\.|^172\\.(1[6-9]|2[0-9]|3[0-1])\\.", ip)}
+```
+
 ### Сколько участников информационного обмена в сети Доброй Организации?
 
 ```         
-> total_participants <- dns_data %>% select(id.orig_h, id.resp_h) %>% unlist() %>% unique() %>% length()
-> print(paste("Всего участников информационного обмена:", total_participants))
-[1] "Всего участников информационного обмена: 1288"
+all_ips <- unique(c(dns_data$id.orig_h, dns_data$id.resp_h))
+internal_participants <- all_ips[sapply(all_ips, is_internal_ip)]
+ cat(" Участников информационного обмена в сети Доброй Организации:", 
++     length(internal_participants), "\n")
+Участников информационного обмена в сети Доброй Организации: 1267 
 ```
 
 ### Какое соотношение участников обмена внутри сети и участников обращений к внешним ресурсам?
-
-#### Все уникальные IP
-
-```  
-all_ips <- dns_data %>% select(id.orig_h, id.resp_h) %>% unlist() %>% unique()
-```
-
-#### Внутренние IP 
-
 ```         
-internal_ips <- all_ips[grepl("^192\\.168\\.|^10\\.|^172\\.", all_ips)]
-```
-
-#### Внешние IP
-
-```         
-external_ips <- setdiff(all_ips, internal_ips)
-```
-
-#### Вывод
-
-```         
-> print(paste("Внутренних участников:", internal_count))
-[1] "Внутренних участников: 1211"
-> print(paste("Внешних участников:", external_count))
-[1] "Внешних участников: 77"
-> print(paste("Соотношение внутренних/внешних:", round(internal_count/external_count, 2)))
-[1] "Соотношение внутренних/внешних: 15.73"
+internal_count <- length(internal_participants)
+external_count <- length(all_ips) - internal_count
+cat("Соотношение участников:\n")
+Соотношение участников:
+cat("   Внутренних:", internal_count, "\n")
+   Внутренних: 1267 
+cat("   Внешних:", external_count, "\n")
+   Внешних: 92 
+cat("   Соотношение внутренних/внешних:", 
++     round(internal_count/external_count, 2), "\n")
+   Соотношение внутренних/внешних: 13.77 
 ```
 
 ### Найдите топ-10 участников сети, проявляющих наибольшую сетевую активность.
 ```
-> top_active_ips <- dns_data %>% count(id.orig_h, sort = TRUE) %>% head(10)
-> print("Топ-10 самых активных участников:")
-[1] "Топ-10 самых активных участников:"
-> top_active_ips %>% print()
-         id.orig_h     n
-1    10.10.117.210 75943
-2   192.168.202.93 15725
-3    10.10.117.209 14222
-4   192.168.202.97 14216
-5  192.168.202.110 13372
-6  192.168.202.103 12818
-7   192.168.203.63 11962
-8   192.168.202.76 10950
-9  192.168.229.252  9530
-10  192.168.202.83  9165
+top_active <- dns_data %>% filter(sapply(id.orig_h, is_internal_ip)) %>% count(id.orig_h, sort = TRUE) %>% head(10)
+cat(" Топ-10 самых активных участников:\n")
+Топ-10 самых активных участников:
+> print(top_active)
+# A tibble: 10 × 2
+   id.orig_h           n
+   <chr>           <int>
+ 1 10.10.117.210   75943
+ 2 192.168.202.93  26522
+ 3 192.168.202.103 18121
+ 4 192.168.202.76  16978
+ 5 192.168.202.97  16176
+ 6 192.168.202.141 14967
+ 7 10.10.117.209   14222
+ 8 192.168.202.110 13372
+ 9 192.168.203.63  12148
+10 192.168.202.106 10784
 ```
 
 ### Найдите топ-10 доменов, к которым обращаются пользователи сети и соответственное количество обращений
 ```
-top_domains <- dns_data %>% filter(!is.na(query), query != "", query != "-") %>% count(query, sort = TRUE) %>% head(10)
-print("Топ-10 доменов по количеству обращений:")
-print(top_domains)
-  query      n
-1     1 317087
-2     -   2483
-3     3    824
-4 32769    446
+top_domains <- dns_data %>% filter(!is.na(query), query != "", !grepl("^\\\\|\\*", query)) %>% count(query, sort = TRUE) %>% head(10)
+cat(" Топ-10 доменов :\n")
+Топ-10 доменов:
+> print(top_domains)
+# A tibble: 10 × 2
+   query                               n
+   <chr>                           <int>
+ 1 teredo.ipv6.microsoft.com       39273
+ 2 tools.google.com                14057
+ 3 www.apple.com                   13390
+ 4 time.apple.com                  13109
+ 5 safebrowsing.clients.google.com 11658
+ 6 WPAD                             9134
+ 7 44.206.168.192.in-addr.arpa      7248
+ 8 HPE8AA67                         6929
+ 9 ISATAP                           6569
+10 imap.gmail.com                   5543
 ```
 
 ### Опеределите базовые статистические характеристики (функция summary() ) интервала времени между последовательными обращениями к топ-10 доменам.
 ```
-analyze_time_intervals <- function(domain_name) {
-  intervals <- dns_data %>%
-    filter(query == domain_name) %>%
-    arrange(ts) %>%
-    mutate(time_diff = as.numeric(difftime(ts, lag(ts), units = "secs"))) %>%
-    pull(time_diff) %>%
-    .[!is.na(.)]
-  
-  if (length(intervals) > 0) {
-    return(summary(intervals))
-  } else {
-    return("Недостаточно данных")
-  }
-}
+analyze_intervals <- function(domain) {
++     intervals <- dns_data %>%
++         filter(query == domain) %>%
++         arrange(ts) %>%
++         mutate(diff = as.numeric(difftime(ts, lag(ts), units = "secs"))) %>%
++         pull(diff) %>%
++         na.omit()
++     
++     if (length(intervals) > 0) {
++         return(summary(intervals))
++     } else {
++         return("Недостаточно данных")
++     }
++ }
+> 
+> cat("Статистика интервалов для топ-3 доменов:\n")
+Статистика интервалов для топ-3 доменов:
+> for(i in 1:min(3, nrow(top_domains))) {
++     cat("\nДомен:", top_domains$query[i], "\n")
++     print(analyze_intervals(top_domains$query[i]))
++ }
 
-print("Статистика интервалов времени для топ-3 доменов:")
-for(i in 1:min(3, nrow(top_domains))) {
-  domain <- top_domains$query[i]
-  print(paste("Домен:", domain))
-  print(analyze_time_intervals(domain))
-  cat("\n")
-}
-[1] "Домен: 1"
+Домен: teredo.ipv6.microsoft.com 
      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-    0.000     0.000     0.010     0.278     0.120 49669.280 
+    0.000     0.000     0.000     2.941     0.510 50387.760 
 
-[1] "Домен: -"
+Домен: tools.google.com 
      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-    0.000     0.010     0.655    35.546     2.890 49786.850 
+    0.000     0.000     0.000     8.187     1.000 50364.830 
 
-[1] "Домен: 3"
-   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-   0.00    0.00    0.01   39.45    1.02 7115.93 
-
-[1] "Домен: 32769"
-    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-    0.00     0.06     1.65   195.15     2.21 52833.48 
+Домен: www.apple.com 
+     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+    0.000     0.000     1.000     8.607     3.010 50963.630 
+> 
 ```
 
 ### Часто вредоносное программное обеспечение использует DNS канал в качестве канала управления, периодически отправляя запросы на подконтрольный злоумышленникам DNS сервер. По периодическим запросам на один и тот же домен можно выявить скрытый DNS канал. Есть ли такие IP адреса в исследуемом датасете?
 ```
-
 > suspicious_dns <- dns_data %>%
-+     filter(!is.na(query), query != "", query != "1", query != "-") %>%
++     filter(sapply(id.orig_h, is_internal_ip),
++            !is.na(query), query != "",
++            !grepl("^\\\\|\\*", query)) %>%
 +     group_by(id.orig_h, query) %>%
 +     summarise(
 +         request_count = n(),
-+         first_request = min(ts),
-+         last_request = max(ts),
-+         time_span = as.numeric(max(ts) - min(ts)),
-+         avg_interval = ifelse(request_count > 1, time_span / (request_count - 1), NA),
++         time_span = as.numeric(difftime(max(ts), min(ts), units = "secs")),
++         avg_interval = ifelse(request_count > 1, 
++                               time_span / (request_count - 1), 
++                               NA),
 +         .groups = 'drop'
 +     ) %>%
-+     filter(request_count >= 3, 
++     filter(request_count >= 5, 
 +            !is.na(avg_interval), 
-+            avg_interval > 0) %>%
++            avg_interval > 0,
++            avg_interval < 300) %>%  
 +     arrange(avg_interval)
 > 
-> print("9. Анализ на скрытые DNS-каналы:")
-[1] "9. Анализ на скрытые DNS-каналы:"
+> cat("Подозрительные DNS-каналы (периодические запросы):\n")
+Подозрительные DNS-каналы (периодические запросы):
 > if(nrow(suspicious_dns) > 0) {
-+     print("Обнаружены подозрительные паттерны:")
-+     suspicious_dns %>% print()
++     print(head(suspicious_dns, 10))
 + } else {
-+     print("Явных признаков скрытых DNS-каналов не обнаружено")
++     cat("Не обнаружено\n")
 + }
-[1] "Обнаружены подозрительные паттерны:"
-# A tibble: 17 × 7
-   id.orig_h                    query request_count first_request       last_request        time_span avg_interval
-   <chr>                        <chr>         <int> <dttm>              <dttm>                  <dbl>        <dbl>
- 1 192.168.202.110              32769           406 2012-03-16 17:19:02 2012-03-16 22:45:43      5.44       0.0134
- 2 192.168.202.110              3               111 2012-03-16 17:11:53 2012-03-16 22:33:56      5.37       0.0488
- 3 192.168.202.102              3               515 2012-03-16 17:02:00 2012-03-16 17:45:46     43.8        0.0852
- 4 2001:dbb:c18:202:20c:29ff:f… 3                11 2012-03-16 22:46:05 2012-03-16 22:47:13      1.13       0.113 
- 5 192.168.204.45               3                65 2012-03-16 17:23:54 2012-03-17 01:45:40      8.36       0.131 
- 6 192.168.202.4                3                12 2012-03-16 23:37:08 2012-03-16 23:39:59      2.84       0.258 
- 7 192.168.202.108              3                76 2012-03-16 18:51:26 2012-03-16 19:11:36     20.2        0.269 
- 8 192.168.202.79               3                16 2012-03-16 16:44:32 2012-03-16 22:15:40      5.52       0.368 
- 9 fe80::c62c:3ff:fe37:efc      32769             8 2012-03-16 16:59:06 2012-03-16 23:57:40      6.98       0.997 
-10 fe80::ba8d:12ff:fe53:a8d8    32769             8 2012-03-16 16:47:50 2012-03-17 00:15:35      7.46       1.07  
-11 fe80::3e07:54ff:fe1c:a665    32769             3 2012-03-16 22:18:22 2012-03-17 01:03:39      2.75       1.38  
-12 fe80::3e07:54ff:fe41:3ed3    32769             6 2012-03-16 17:20:03 2012-03-17 16:42:35     23.4        4.68  
-13 fe80::62fb:42ff:feef:5440    32769             5 2012-03-16 20:16:37 2012-03-17 16:55:12     20.6        5.16  
-14 192.168.202.83               3                 4 2012-03-16 23:12:54 2012-03-16 23:37:07     24.2        8.07  
-15 192.168.202.80               3                 4 2012-03-16 18:50:37 2012-03-16 18:51:20     43.5       14.5   
-16 192.168.203.45               3                 4 2012-03-16 17:09:42 2012-03-16 17:10:33     51.6       17.2   
-17 192.168.202.94               3                 4 2012-03-16 17:40:11 2012-03-16 17:41:06     55.7       18.6   
+# A tibble: 10 × 5
+   id.orig_h       query                           request_count time_span avg_interval
+   <chr>           <chr>                                   <int>     <dbl>        <dbl>
+ 1 192.168.202.103 fxfeeds.mozilla.com                        16   0.01000     0.000667
+ 2 192.168.202.79  www.iana.org                               16   0.01000     0.000667
+ 3 192.168.202.94  quickdraw.splunk.com                       16   0.01000     0.000667
+ 4 192.168.202.108 versioncheck.addons.mozilla.org            12   0.01000     0.000909
+ 5 192.168.202.138 www.midatlanticccdc.org                    16   0.0200      0.00133 
+ 6 192.168.203.61  addons.mozilla.org                         16   0.0200      0.00133 
+ 7 192.168.203.62  addons.mozilla.org                         16   0.0200      0.00133 
+ 8 192.168.204.70  de3.php.net                                16   0.0200      0.00133 
+ 9 192.168.202.112 filezilla.sourceforge.net                   8   0.01000     0.00143 
+10 192.168.202.112 php.net                                     8   0.01000     0.00143
 ```
 
 ### Определите местоположение (страну, город) и организацию-провайдера для топ-10 доменов. Для этого можно использовать сторонние сервисы, например http://ip-api.com (API-ндпоинт –http:/ /ip-api.com/json).
 ```
-get_geo_info <- function(ip) {
+> library(httr)
+> library(purrr)
+> 
+> get_geo_info <- function(ip) {
 +     tryCatch({
-+         response <- GET(paste0("http://ip-api.com/json/", ip))
-+         if (status_code(response) == 200) {
++         if(grepl(":", ip)) return(NULL)  
++         
++         response <- GET(paste0("http://ip-api.com/json/", ip), 
++                         timeout(5))
++         if(status_code(response) == 200) {
 +             info <- content(response, "parsed")
-+             return(tibble(
++             return(data.frame(
 +                 ip = ip,
 +                 country = ifelse(!is.null(info$country), info$country, NA),
 +                 city = ifelse(!is.null(info$city), info$city, NA),
 +                 isp = ifelse(!is.null(info$isp), info$isp, NA),
-+                 org = ifelse(!is.null(info$org), info$org, NA)
++                 stringsAsFactors = FALSE
 +             ))
 +         }
 +     }, error = function(e) NULL)
 +     return(NULL)
 + }
-> external_ips_for_geo <- dns_data %>%
-+     filter(!grepl("^192\\.168\\.|^10\\.|^172\\.|^fe80::", id.resp_h),
-+            id.resp_h != "ff02::1:3",
-+            id.resp_h != "-") %>%
+> 
+> external_ips <- dns_data %>%
++     filter(!sapply(id.resp_h, is_internal_ip),
++            !grepl(":", id.resp_h),
++            id.resp_h != "255.255.255.255") %>%
 +     distinct(id.resp_h) %>%
 +     head(5)
-> print("10. Геолокация для внешних IP адресов:")
-[1] "10. Геолокация для внешних IP адресов:"
-> print(paste("Найдено внешних IP:", length(external_ips_for_geo)))
-[1] "Найдено внешних IP: 1"
 > 
-> if(length(external_ips_for_geo) > 0) {
-+     geo_results <- map_df(external_ips_for_geo, get_geo_info)
-+     
+> cat("Геолокация для 5 внешних IP:\n")
+Геолокация для 5 внешних IP:
+> if(nrow(external_ips) > 0) {
++     geo_results <- map_df(external_ips$id.resp_h, get_geo_info)
 +     if(nrow(geo_results) > 0) {
-+         print("Геолокационная информация:")
-+         geo_results %>% print()
++         print(geo_results)
 +     } else {
-+         print("Не удалось получить геолокационную информацию")
++         cat("Не удалось получить геолокацию\n")
 +     }
 + } else {
-+     print("Внешние IP для геолокации не найдены")
++     cat("Внешние IP не найдены\n")
 + }
-[1] "Не удалось получить геолокационную информацию"
+             ip       country     city                       isp
+1 156.154.70.22 United States New York Neustar Security Services
+2    8.26.56.26 United States  Clifton           Flexential Corp
+3 198.153.192.1        Canada  Toronto Neustar Security Services
+4 198.153.194.1 United States New York Neustar Security Services
 ```

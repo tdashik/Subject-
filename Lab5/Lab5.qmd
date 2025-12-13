@@ -257,33 +257,317 @@ print("Устройства с поддержкой WPA3:")
 
 ### Отсортировать точки доступа по интервалу времени, в течение которого они находились на связи, по убыванию.
 ```
+> ap_session_analysis <- ap_with_manufacturers %>%
++     arrange(BSSID, First_time) %>%
++     group_by(BSSID) %>%
++     mutate(
++         session_gap = as.numeric(difftime(First_time, lag(Last_time), units = "mins")),
++         new_session = is.na(session_gap) | session_gap > 45,
++         session_id = cumsum(new_session)
++     ) %>%
++     group_by(BSSID, ESSID, Manufacturer, session_id) %>%
++     summarise(
++         session_start = min(First_time),
++         session_end = max(Last_time),
++         total_duration_min = as.numeric(difftime(session_end, session_start, units = "mins")),
++         avg_power = mean(power, na.rm = TRUE),
++         max_speed = max(speed, na.rm = TRUE),
++         total_beacons = sum(beacons, na.rm = TRUE),
++         .groups = 'drop'
++     ) %>%
++     group_by(BSSID, ESSID, Manufacturer) %>%
++     summarise(
++         total_connection_time_min = sum(total_duration_min),
++         session_count = n(),
++         avg_session_duration = mean(total_duration_min),
++         avg_power_overall = mean(avg_power, na.rm = TRUE),
++         max_speed_overall = max(max_speed, na.rm = TRUE),
++         total_beacons_overall = sum(total_beacons, na.rm = TRUE),
++         .groups = 'drop'
++     ) %>%
++     arrange(desc(total_connection_time_min))
+> 
+> print("Точки доступа по общему времени на связи (с учетом сессий):")
+[1] "Точки доступа по общему времени на связи (с учетом сессий):"
+> head(ap_session_analysis, 15)
+# A tibble: 15 × 9
+   BSSID       ESSID Manufacturer total_connection_tim…¹ session_count avg_session_duration avg_power_overall
+   <chr>       <chr> <chr>                         <dbl>         <int>                <dbl>             <dbl>
+ 1 00:25:00:F… NA    Cisco                          163.             1                 163.                -1
+ 2 E8:28:C1:D… MIRE… Unknown                        163.             1                 163.               -67
+ 3 E8:28:C1:D… MIRE… Unknown                        163.             1                 163.               -63
+ 4 08:3A:2F:5… NA    Unknown                        162.             1                 162.                -1
+ 5 6E:C7:EC:1… Cnet  Unknown                        162.             1                 162.               -30
+ 6 E8:28:C1:D… MIRE… Unknown                        162.             1                 162.               -63
+ 7 48:5B:39:F… NA    Unknown                        162.             1                 162.               -61
+ 8 E8:28:C1:D… NA    Unknown                        162.             1                 162.               -63
+ 9 E8:28:C1:D… NA    Unknown                        162.             1                 162.                -1
+10 8E:55:4A:8… Vlad… Unknown                        162.             1                 162.               -51
+11 00:26:99:B… GIVC  Unknown                        162.             1                 162.               -70
+12 00:26:99:F… GIVC  Unknown                        162.             1                 162.               -65
+13 1E:93:E3:1… Gala… Unknown                        161.             1                 161.               -42
+14 0C:80:63:A… NA    Unknown                        160.             1                 160.               -65
+15 9A:75:A8:B… KC    Unknown                        160.             1                 160.               -68
+```
 
+### Обнаружить топ-10 самых быстрых точек доступа.
+```
+> fastest_aps <- ap_with_manufacturers %>%
++     group_by(BSSID, ESSID, Manufacturer) %>%
++     summarise(
++         max_speed = max(speed, na.rm = TRUE),
++         avg_speed = mean(speed, na.rm = TRUE),
++         avg_power = mean(power, na.rm = TRUE),
++         connection_count = n(),
++         .groups = 'drop'
++     ) %>%
++     filter(!is.na(max_speed) & max_speed > 0) %>%
++     arrange(desc(max_speed)) %>%
++     head(10)
+> 
+> print("Топ-10 самых быстрых точек доступа:")
+[1] "Топ-10 самых быстрых точек доступа:"
+> fastest_aps
+# A tibble: 10 × 7
+   BSSID             ESSID              Manufacturer max_speed avg_speed avg_power connection_count
+   <chr>             <chr>              <chr>            <dbl>     <dbl>     <dbl>            <int>
+ 1 26:20:53:0C:98:E8 NA                 Unknown            866       866       -85                1
+ 2 8E:1F:94:96:DA:FD iPhone (Анастасия) Unknown            866       866       -67                1
+ 3 96:FF:FC:91:EF:64 NA                 Unknown            866       866       -85                1
+ 4 CE:48:E7:86:4E:33 iPhone (Анастасия) Unknown            866       866       -65                1
+ 5 02:B3:45:5A:05:93 HONOR 30           Unknown            360       360       -75                1
+ 6 14:EB:B6:6A:76:37 Gnezdo_lounge 2    Unknown            360       360       -85                1
+ 7 4A:EC:1E:DB:BF:95 POCO X5 Pro 5G     Unknown            360       360       -37                1
+ 8 56:C5:2B:9F:84:90 OnePlus 6T         Unknown            360       360       -64                1
+ 9 9A:75:A8:B9:04:1E KC                 Unknown            360       360       -68                1
+10 E8:28:C1:DC:B2:40 MIREA_HOTSPOT      Unknown            360       360       -88                1
+```
+
+### Отсортировать точки доступа по частоте отправки запросов (beacons) в единицу времени по их убыванию.
+```
+> beacon_analysis <- ap_with_manufacturers %>%
++     mutate(
++         connection_duration_hours = as.numeric(difftime(Last_time, First_time, units = "hours")),
++         beacon_rate = ifelse(connection_duration_hours > 0, 
++                              beacons / connection_duration_hours,
++                              beacons)
++     ) %>%
++     group_by(BSSID, ESSID, Manufacturer) %>%
++     summarise(
++         total_beacons = sum(beacons, na.rm = TRUE),
++         total_duration_hours = sum(connection_duration_hours, na.rm = TRUE),
++         avg_beacon_rate = ifelse(total_duration_hours > 0,
++                                  total_beacons / total_duration_hours,
++                                  total_beacons),
++         avg_power = mean(power, na.rm = TRUE),
++         .groups = 'drop'
++     ) %>%
++     arrange(desc(avg_beacon_rate))
+> 
+> print("Точки доступа по частоте beacon'ов:")
+[1] "Точки доступа по частоте beacon'ов:"
+> head(beacon_analysis, 15)
+# A tibble: 15 × 7
+   BSSID             ESSID          Manufacturer total_beacons total_duration_hours avg_beacon_rate avg_power
+   <chr>             <chr>          <chr>                <dbl>                <dbl>           <dbl>     <dbl>
+ 1 F2:30:AB:E9:03:ED iPhone (Ulian… Unknown                  6             0.00194            3086.       -53
+ 2 B2:CF:C0:00:4A:60 Михаил's Gala… Unknown                  4             0.00139            2880        -67
+ 3 3A:DA:00:F9:0C:02 iPhone XS Max… Unknown                  5             0.0025             2000        -65
+ 4 00:3E:1A:5D:14:45 MT_FREE        Unknown                  1             0.000556           1800        -57
+ 5 02:BC:15:7E:D5:DC MT_FREE        Unknown                  1             0.000556           1800        -67
+ 6 76:C5:A0:70:08:96 NA             Unknown                  1             0.000556           1800        -52
+ 7 D2:25:91:F6:6C:D8 Саня           Unknown                  5             0.00361            1385.       -62
+ 8 BE:F1:71:D6:10:D7 C322U21 0566   Unknown               1647             2.63                627.       -27
+ 9 00:03:7A:1A:03:56 MT_FREE        Unknown                  1             0.00167             600        -68
+10 38:1A:52:0D:84:D7 EBFCD57F-EE81… Unknown                704             1.20                587.       -38
+11 0A:C5:E1:DB:17:7B AndroidAP177B  Unknown               1251             2.39                523.       -38
+12 1E:93:E3:1B:3C:F4 Galaxy A71     Unknown               1390             2.68                519.       -42
+13 D2:6D:52:61:51:5D NA             Unknown                647             1.29                502.       -57
+14 BE:F1:71:D5:0E:53 C322U06 9080   Unknown                617             1.27                485.       -66
+15 4A:86:77:04:B7:28 iPhone (Искан… Unknown                361             0.836               432.       -37
 ```
 
 
-## Анализ данных клиента
+## Данные клиентов
 
 ### Определить производителя для каждого обнаруженного устройства
-
-####  Применяем к клиентам
 ```
-client_with_manufacturers <- client_data %>%
+> client_manufacturer_stats <- client_with_manufacturers %>%
++     group_by(Manufacturer) %>%
++     summarise(
++         device_count = n_distinct(Station_MAC),
++         avg_power = mean(power, na.rm = TRUE),
++         total_packets = sum(packets, na.rm = TRUE),
++         avg_packets_per_device = total_packets / device_count,
++         avg_session_duration_min = mean(as.numeric(difftime(Last_time, First_time, units = "mins")), na.rm = TRUE),
++         .groups = 'drop'
++     ) %>%
++     arrange(desc(device_count))
+> 
+> print("Статистика по производителям клиентских устройств:")
+[1] "Статистика по производителям клиентских устройств:"
+> client_manufacturer_stats
+# A tibble: 1 × 6
+  Manufacturer device_count avg_power total_packets avg_packets_per_device avg_session_duration_min
+  <chr>               <int>     <dbl>         <dbl>                  <dbl>                    <dbl>
+1 Unknown             12081     -56.1         84569                   7.00                     1.87
+```
+
+### Обнаружить устройства, которые НЕ рандомизируют свой MAC адрес
+```
+randomization_stats <- client_with_randomization_check %>%
++     group_by(Manufacturer, is_randomized) %>%
++     summarise(
++         device_count = n_distinct(Station_MAC),
++         .groups = 'drop'
++     ) %>%
++     pivot_wider(
++         names_from = is_randomized,
++         values_from = device_count,
++         values_fill = 0
++     ) %>%
++     rename(
++         Real_MAC = `FALSE`,
++         Randomized_MAC = `TRUE`
++     ) %>%
 +     mutate(
-+         OUI = map_chr(Station_MAC, extract_oui),
-+         Manufacturer = map_chr(Station_MAC, find_manufacturer)
-+     )
++         Total_Devices = Real_MAC + Randomized_MAC,
++         Randomization_Rate = round(Randomized_MAC / Total_Devices * 100, 1)
++     ) %>%
++     arrange(desc(Total_Devices))
+> 
+> print("Статистика рандомизации MAC по производителям:")
+[1] "Статистика рандомизации MAC по производителям:"
+> randomization_stats
+# A tibble: 1 × 5
+  Manufacturer Real_MAC Randomized_MAC Total_Devices Randomization_Rate
+  <chr>           <int>          <int>         <int>              <dbl>
+1 Unknown           217          11864         12081               98.2
 ```
 
-#### Просмотр результатов
+
+
+### Кластеризовать запросы от устройств к точкам доступа по их именам. Определить время появления устройства в зоне радиовидимости и время выхода его из нее.
 ```
-print("Производители клиентских устройств:")
-[1] "Производители клиентских устройств:"
-> client_with_manufacturers %>%
-+     count(Manufacturer) %>%
-+     arrange(desc(n)) %>%
-+     print(n = 20)
-# A tibble: 1 × 2
-  Manufacturer     n
-  <chr>        <int>
-1 Unknown      12081
+> client_clusters <- client_with_manufacturers %>%
++     filter(!is.na(Probed_ESSIDs) & 
++                Probed_ESSIDs != "" & 
++                Probed_ESSIDs != "(not associated)") %>%
++     group_by(Station_MAC, Manufacturer, Probed_ESSIDs) %>%
++     summarise(
++         first_seen = min(First_time),
++         last_seen = max(Last_time),
++         request_count = n(),
++         avg_power = mean(power, na.rm = TRUE),
++         min_power = min(power, na.rm = TRUE),
++         max_power = max(power, na.rm = TRUE),
++         total_packets = sum(packets, na.rm = TRUE),
++         .groups = 'drop'
++     ) %>%
++     mutate(
++         visibility_duration_min = as.numeric(difftime(last_seen, first_seen, units = "mins")),
++         cluster_id = paste(Station_MAC, Probed_ESSIDs, sep = "_")
++     ) %>%
++     arrange(Station_MAC, first_seen)
+> 
+> print("Кластеризованные запросы клиентов (топ-20 по количеству запросов):")
+[1] "Кластеризованные запросы клиентов (топ-20 по количеству запросов):"
+> client_clusters %>%
++     arrange(desc(request_count)) %>%
++     head(20)
+# A tibble: 20 × 12
+   Station_MAC     Manufacturer Probed_ESSIDs first_seen          last_seen           request_count avg_power
+   <chr>           <chr>        <chr>         <dttm>              <dttm>                      <int>     <dbl>
+ 1 00:90:4C:E6:54… Unknown      Redmi         2023-07-28 09:16:59 2023-07-28 10:21:15             1       -65
+ 2 00:95:69:E7:7C… Unknown      nvripcsuite   2023-07-28 09:13:11 2023-07-28 11:56:13             1       -55
+ 3 00:95:69:E7:7D… Unknown      nvripcsuite   2023-07-28 09:13:15 2023-07-28 11:56:17             1       -33
+ 4 00:95:69:E7:7F… Unknown      nvripcsuite   2023-07-28 09:13:11 2023-07-28 11:56:07             1       -69
+ 5 00:F4:8D:F7:C5… Unknown      Redmi 12      2023-07-28 10:45:04 2023-07-28 11:43:26             1       -73
+ 6 02:00:00:00:00… Unknown      xt3 w64dtgv5… 2023-07-28 09:54:40 2023-07-28 11:55:36             1       -67
+ 7 02:06:2B:A5:0C… Unknown      Avenue611     2023-07-28 09:55:12 2023-07-28 09:55:12             1       -65
+ 8 02:1D:0F:A4:94… Unknown      iPhone (Дима… 2023-07-28 09:57:08 2023-07-28 09:57:08             1       -61
+ 9 02:32:DC:56:5C… Unknown      Timo Resort   2023-07-28 10:58:23 2023-07-28 10:58:24             1       -84
+10 02:35:E9:C2:44… Unknown      iPhone (Макс… 2023-07-28 10:00:55 2023-07-28 10:00:55             1       -88
+11 02:45:73:F2:9B… Unknown      AndroidShare… 2023-07-28 10:43:22 2023-07-28 10:43:22             1       -49
+12 02:4A:77:D5:A1… Unknown      GIVC          2023-07-28 10:37:34 2023-07-28 10:37:34             1       -61
+13 02:4F:59:FB:38… Unknown      1             2023-07-28 11:33:10 2023-07-28 11:33:11             1       -53
+14 02:5E:4B:90:72… Unknown      IT2 Wireless  2023-07-28 11:12:45 2023-07-28 11:12:45             1       -61
+15 02:69:A5:29:F1… Unknown      Galaxy A71    2023-07-28 10:52:35 2023-07-28 11:24:51             1       -49
+16 02:70:B9:F6:E8… Unknown      GIVC          2023-07-28 10:53:14 2023-07-28 10:53:14             1       -69
+17 02:7F:36:EB:6A… Unknown      HONOR 30      2023-07-28 09:57:08 2023-07-28 09:57:08             1       -57
+18 02:8A:90:BF:1F… Unknown      region        2023-07-28 09:49:17 2023-07-28 09:49:17             1       -55
+19 02:8A:9E:36:D1… Unknown      GIVC          2023-07-28 10:45:32 2023-07-28 10:45:32             1       -59
+20 02:8B:92:EC:71… Unknown      IT2 Wireless  2023-07-28 09:36:49 2023-07-28 09:36:49             1       -63
+```
+
+###  Оценить стабильность уровня сигнала внури кластера во времени. Выявить наиболее стабильный кластер.
+```
+> signal_stability_analysis <- client_with_manufacturers %>%
++     filter(!is.na(Probed_ESSIDs) & 
++                Probed_ESSIDs != "" & 
++                Probed_ESSIDs != "(not associated)") %>%
++     group_by(Probed_ESSIDs) %>%
++     summarise(
++         cluster_size = n(),
++         unique_devices = n_distinct(Station_MAC),
++         mean_power = mean(power, na.rm = TRUE),
++         sd_power = sd(power, na.rm = TRUE),
++         min_power = min(power, na.rm = TRUE),
++         max_power = max(power, na.rm = TRUE),
++         power_range = max_power - min_power,
++         .groups = 'drop'
++     ) %>%
++     mutate(
++         cv_power = ifelse(mean_power != 0, sd_power / abs(mean_power), NA),
++         stability_score = ifelse(!is.na(cv_power), 1 / (1 + cv_power), 0)
++     ) %>%
++     filter(!is.na(cv_power)) %>%
++     arrange(desc(stability_score))
+> 
+> print("Стабильность сигнала по кластерам (топ-15 самых стабильных):")
+[1] "Стабильность сигнала по кластерам (топ-15 самых стабильных):"
+> head(signal_stability_analysis, 15)
+# A tibble: 15 × 10
+   Probed_ESSIDs     cluster_size unique_devices mean_power sd_power min_power max_power power_range cv_power
+   <chr>                    <int>          <int>      <dbl>    <dbl>     <dbl>     <dbl>       <dbl>    <dbl>
+ 1 Galaxy A71                   2              2      -48.5    0.707       -49       -48           1   0.0146
+ 2 podval                       4              4      -65      1.63        -67       -63           4   0.0251
+ 3 Kesha                        2              2      -52      1.41        -53       -51           2   0.0272
+ 4 Tupik                        3              3      -65.7    2.31        -67       -63           4   0.0352
+ 5 KB-12                        2              2      -69      2.83        -71       -67           4   0.0410
+ 6 Reconn-Guest                 2              2      -69      2.83        -71       -67           4   0.0410
+ 7 OKB                          3              3      -71.7    3.06        -75       -69           6   0.0426
+ 8 Rayskaya_banya               3              3      -68.3    3.06        -71       -65           6   0.0447
+ 9 MT_FREE                      5              5      -65.4    2.97        -69       -61           8   0.0454
+10 vestis.local                 4              4      -63.5    3.42        -67       -59           8   0.0538
+11 IKB                          3              3      -55.7    3.06        -59       -53           6   0.0549
+12 AAAAAOB/CC0ADwGk…            3              3      -67      4           -71       -63           8   0.0597
+13 Alex-net2                    2              2      -64      4.24        -67       -61           6   0.0663
+14 Sber-Guest                   2              2      -64      4.24        -67       -61           6   0.0663
+15 Beeline_5G_F2F425            2              2      -56      4.24        -59       -53           6   0.0758
+# ℹ 1 more variable: stability_score <dbl>
+> 
+> print("Наименее стабильные кластеры (топ-15):")
+[1] "Наименее стабильные кластеры (топ-15):"
+> signal_stability_analysis %>%
++     arrange(stability_score) %>%
++     head(15)
+# A tibble: 15 × 10
+   Probed_ESSIDs     cluster_size unique_devices mean_power sd_power min_power max_power power_range cv_power
+   <chr>                    <int>          <int>      <dbl>    <dbl>     <dbl>     <dbl>       <dbl>    <dbl>
+ 1 Cnet                         4              4      -37      25.0        -59        -1          58    0.677
+ 2 C322U13 3965                 2              2      -47      19.8        -61       -33          28    0.421
+ 3 nvripcsuite                  3              3      -52.3    18.1        -69       -33          36    0.347
+ 4 Optus_B818_87A5              2              2      -42       9.90       -49       -35          14    0.236
+ 5 C322U06 5179                 2              2      -37       8.49       -43       -31          12    0.229
+ 6 RT-WiFi-8A6C                 7              7      -56.3    10.9        -67       -35          32    0.194
+ 7 KB-13                        5              5      -58.2    11.2        -71       -45          26    0.192
+ 8 Redmi Note 8 Pro             2              2      -49       8.49       -55       -43          12    0.173
+ 9 MIREA_HOTSPOT               36             36      -61.9    10.3        -83       -23          60    0.167
+10 AndroidShare_1576           64             64      -54.7     9.12       -83       -41          42    0.167
+11 SSU_BR5                      3              3      -55       8.72       -65       -49          16    0.159
+12 Beeline121                   5              5      -50.6     7.80       -61       -41          20    0.154
+13 it                           4              4      -58.5     9          -71       -51          20    0.154
+14 KOTIKI_XXX                   3              3      -72.3    11.0        -85       -65          20    0.152
+15 MTS_GPON5_ac0968             6              6      -75.3    10.1        -81       -55          26    0.135
 ```

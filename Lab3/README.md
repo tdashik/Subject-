@@ -2,7 +2,7 @@
 daria.toikina@yandex.ru
 2025-11-17
 
-## Цель работы
+# Цель работы
 
 1\. Развить практические навыки использования языка программирования R
 для обработки данных
@@ -13,126 +13,175 @@ daria.toikina@yandex.ru
 пакета dplyr – функции select(), filter(), mutate(), arrange(),
 group_by()
 
-### Установка пакетов
+# Выполнение практического задания
 
-    install.packages("nycflights13")
+# Загружаем необходимые библиотеки
 
-## Выполнение практического задания
+``` r
+library(nycflights13)
+library(dplyr)
+```
 
-### 1. Сколько встроенных в пакет nycflights13 датафреймов?
 
-    length(data(package = "nycflights13")$results[, 3])
+    Attaching package: 'dplyr'
+
+    The following objects are masked from 'package:stats':
+
+        filter, lag
+
+    The following objects are masked from 'package:base':
+
+        intersect, setdiff, setequal, union
+
+## 1. Сколько встроенных в пакет nycflights13 датафреймов?
+
+``` r
+length(data(package = "nycflights13")$results[, 3])
+```
+
     [1] 5
 
-### 2. Сколько строк в каждом датафрейме?
+## 2. Сколько строк в каждом датафрейме?
 
-    lapply(data(package = "nycflights13")$results[, 3],  function(x) c(x, nrow(get(x))))
-    [[1]]
-    [1] "airlines" "16"      
+``` r
+starwars %>% nrow()
+```
 
-    [[2]]
-    [1] "airports" "1458"    
+    [1] 87
 
-    [[3]]
-    [1] "flights" "336776" 
+## 3. Сколько столбцов в каждом датафрейме?
 
-    [[4]]
-    [1] "planes" "3322"  
+``` r
+starwars %>% ncol()
+```
 
-    [[5]]
-    [1] "weather" "26115"  
+    [1] 14
 
-### 3. Сколько столбцов в каждом датафрейме?
+## 4. Как просмотреть примерный вид датафрейма?
 
-    lapply(data(package = "nycflights13")$results[, 3], function(x) c(x, ncol(get(x))))
-    [[1]]
-    [1] "airlines" "2"       
+``` r
+glimpse(flights)
+```
 
-    [[2]]
-    [1] "airports" "8"       
-
-    [[3]]
-    [1] "flights" "19"     
-
-    [[4]]
-    [1] "planes" "9"     
-
-    [[5]]
-    [1] "weather" "15"    
-
-### 4. Как просмотреть примерный вид датафрейма?
-
-    glimpse(flights)
     Rows: 336,776
     Columns: 19
-    $ year           <int> 2013, 2013, 2013, 2013, 2013, 2013, 2013, 2013, 2013, 2013, 2013, 2013, 20…
-    $ month          <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,…
-    $ day            <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,…
-    $ dep_time       <int> 517, 533, 542, 544, 554, 554, 555, 557, 557, 558, 558, 558, 558, 558, 559,…
-    $ sched_dep_time <int> 515, 529, 540, 545, 600, 558, 600, 600, 600, 600, 600, 600, 600, 600, 600,…
-    $ dep_delay      <dbl> 2, 4, 2, -1, -6, -4, -5, -3, -3, -2, -2, -2, -2, -2, -1, 0, -1, 0, 0, 1, -…
-    $ arr_time       <int> 830, 850, 923, 1004, 812, 740, 913, 709, 838, 753, 849, 853, 924, 923, 941…
-    $ sched_arr_time <int> 819, 830, 850, 1022, 837, 728, 854, 723, 846, 745, 851, 856, 917, 937, 910…
-    $ arr_delay      <dbl> 11, 20, 33, -18, -25, 12, 19, -14, -8, 8, -2, -3, 7, -14, 31, -4, -8, -7, …
-    $ carrier        <chr> "UA", "UA", "AA", "B6", "DL", "UA", "B6", "EV", "B6", "AA", "B6", "B6", "U…
-    $ flight         <int> 1545, 1714, 1141, 725, 461, 1696, 507, 5708, 79, 301, 49, 71, 194, 1124, 7…
-    $ tailnum        <chr> "N14228", "N24211", "N619AA", "N804JB", "N668DN", "N39463", "N516JB", "N82…
-    $ origin         <chr> "EWR", "LGA", "JFK", "JFK", "LGA", "EWR", "EWR", "LGA", "JFK", "LGA", "JFK…
-    $ dest           <chr> "IAH", "IAH", "MIA", "BQN", "ATL", "ORD", "FLL", "IAD", "MCO", "ORD", "PBI…
-    $ air_time       <dbl> 227, 227, 160, 183, 116, 150, 158, 53, 140, 138, 149, 158, 345, 361, 257, …
-    $ distance       <dbl> 1400, 1416, 1089, 1576, 762, 719, 1065, 229, 944, 733, 1028, 1005, 2475, 2…
-    $ hour           <dbl> 5, 5, 5, 5, 6, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6,…
-    $ minute         <dbl> 15, 29, 40, 45, 0, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 0, 0, 0, 0, 10, 5, 1…
-    $ time_hour      <dttm> 2013-01-01 05:00:00, 2013-01-01 05:00:00, 2013-01-01 05:00:00, 2013-01-01…
+    $ year           <int> 2013, 2013, 2013, 2013, 2013, 2013, 2013, 2013, 2013, 2…
+    $ month          <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1…
+    $ day            <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1…
+    $ dep_time       <int> 517, 533, 542, 544, 554, 554, 555, 557, 557, 558, 558, …
+    $ sched_dep_time <int> 515, 529, 540, 545, 600, 558, 600, 600, 600, 600, 600, …
+    $ dep_delay      <dbl> 2, 4, 2, -1, -6, -4, -5, -3, -3, -2, -2, -2, -2, -2, -1…
+    $ arr_time       <int> 830, 850, 923, 1004, 812, 740, 913, 709, 838, 753, 849,…
+    $ sched_arr_time <int> 819, 830, 850, 1022, 837, 728, 854, 723, 846, 745, 851,…
+    $ arr_delay      <dbl> 11, 20, 33, -18, -25, 12, 19, -14, -8, 8, -2, -3, 7, -1…
+    $ carrier        <chr> "UA", "UA", "AA", "B6", "DL", "UA", "B6", "EV", "B6", "…
+    $ flight         <int> 1545, 1714, 1141, 725, 461, 1696, 507, 5708, 79, 301, 4…
+    $ tailnum        <chr> "N14228", "N24211", "N619AA", "N804JB", "N668DN", "N394…
+    $ origin         <chr> "EWR", "LGA", "JFK", "JFK", "LGA", "EWR", "EWR", "LGA",…
+    $ dest           <chr> "IAH", "IAH", "MIA", "BQN", "ATL", "ORD", "FLL", "IAD",…
+    $ air_time       <dbl> 227, 227, 160, 183, 116, 150, 158, 53, 140, 138, 149, 1…
+    $ distance       <dbl> 1400, 1416, 1089, 1576, 762, 719, 1065, 229, 944, 733, …
+    $ hour           <dbl> 5, 5, 5, 5, 6, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 6, 6, 6…
+    $ minute         <dbl> 15, 29, 40, 45, 0, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 0…
+    $ time_hour      <dttm> 2013-01-01 05:00:00, 2013-01-01 05:00:00, 2013-01-01 0…
 
-### 5. Сколько компаний-перевозчиков (carrier) учитывают эти наборы данных (представлено в наборах дан- ных)?
+## 5. Сколько компаний-перевозчиков (carrier) учитывают эти наборы данных (представлено в наборах дан- ных)?
 
-    n_distinct(flights$carrier)
+``` r
+n_distinct(flights$carrier)
+```
+
     [1] 16
 
-### 6. Сколько рейсов принял аэропорт John F Kennedy Intl в мае?
+## 6. Сколько рейсов принял аэропорт John F Kennedy Intl в мае?
 
-    flights %>% filter(dest == "JFK", month == 5) %>% nrow()
+``` r
+flights %>% filter(dest == "JFK", month == 5) %>% nrow()
+```
+
     [1] 0
 
-### 7. Какой самый северный аэропорт?
+## 7. Какой самый северный аэропорт?
 
-    airports %>% slice_max(lat, n = 1) %>% select(faa, name)
+``` r
+airports %>% slice_max(lat, n = 1) %>% select(faa, name)
+```
+
     # A tibble: 1 × 2
       faa   name                   
       <chr> <chr>                  
     1 EEN   Dillant Hopkins Airport
 
-### 8. Какой аэропорт самый высокогорный (находится выше всех над уровнем моря)?
+## 8. Какой аэропорт самый высокогорный (находится выше всех над уровнем моря)?
 
-    airports %>% slice_max(alt, n = 1) %>% select(faa, name)
+``` r
+airports %>% slice_max(alt, n = 1) %>% select(faa, name)
+```
+
     # A tibble: 1 × 2
       faa   name     
       <chr> <chr>    
     1 TEX   Telluride
 
-### 9. Какие бортовые номера у самых старых самолетов?
+## 9. Какие бортовые номера у самых старых самолетов?
 
-     planes %>% filter(year == min(year, na.rm = TRUE)) %>% select(tailnum)
+``` r
+ planes %>% filter(year == min(year, na.rm = TRUE)) %>% select(tailnum)
+```
+
     # A tibble: 1 × 1
       tailnum
       <chr>  
     1 N381AA 
 
-### 10. Какая средняя температура воздуха была в сентябре в аэропорту John F Kennedy Intl (в градусах Цельсия).
+## 10. Какая средняя температура воздуха была в сентябре в аэропорту John F Kennedy Intl (в градусах Цельсия).
 
-    weather %>% filter(origin == "JFK", month == 9) %>% summarise(mean_temp_c = mean((temp - 32) * 5/9, na.rm = TRUE))
+``` r
+weather %>% filter(origin == "JFK", month == 9) %>% summarise(mean_temp_c = mean((temp - 32) * 5/9, na.rm = TRUE))
+```
 
-      `mean((temp - 32) * 5/9, na.rm = TRUE)`
-      <dbl>
-      19.4
+    # A tibble: 1 × 1
+      mean_temp_c
+            <dbl>
+    1        19.4
 
 ### 11. Самолеты какой авиакомпании совершили больше всего вылетов в июне?
 
-    flights %>% filter(month == 6) %>% count(carrier, sort = TRUE) %>% slice(1) %>% left_join(airlines) %>% pull(name)
+``` r
+flights %>% filter(month == 6) %>% count(carrier, sort = TRUE) %>% slice(1) %>% left_join(airlines) %>% pull(name)
+```
+
     Joining with `by = join_by(carrier)`
+
     [1] "United Air Lines Inc."
 
 ### 12. Самолеты какой авиакомпании задерживались чаще других в 2013 году?
 
-    flights %>% mutate(delayed = dep_delay > 0 | arr_delay > 0) %>% group_by(carrier) %>% summarise(delay_ratio = mean(delayed, na.rm = TRUE)) %>% arrange(desc(delay_ratio)) %>% slice(1) %>% left_join(airlines) %>% pull(name)
+``` r
+flights %>% mutate(delayed = dep_delay > 0 | arr_delay > 0) %>% group_by(carrier) %>% summarise(delay_ratio = mean(delayed, na.rm = TRUE)) %>% arrange(desc(delay_ratio)) %>% slice(1) %>% left_join(airlines) %>% pull(name)
+```
+
+    Joining with `by = join_by(carrier)`
+
+    [1] "Frontier Airlines Inc."
+
+# Оценка результатов
+
+В рамках данной лабораторной работы был успешно проведен анализ набора
+реальных данных о рейсах nycflights13 с использованием языка R.
+Практические навыки закреплены через выполнение серии аналитических
+задач, требующих работы с несколькими связанными датафреймами. Применены
+ключевые функции dplyr для фильтрации, объединения таблиц, группировки и
+агрегации, что позволило получить содержательные ответы на поставленные
+вопросы о перевозчиках, аэропортах и характеристиках рейсов.
+
+# Вывод
+
+В результате работы был выполнен комплексный анализ реального набора
+данных, включающий определение мета-информации о таблицах, поиск
+экстремальных значений (самый северный и высокогорный аэропорт), расчет
+статистических показателей (средняя температура, доля задержек) и
+выявление лидеров по заданным критериям (наибольшее число вылетов).
+Работа подтвердила умение эффективно использовать инструменты dplyr и
+принципы tidy data для извлечения значимой информации из
+структурированных реляционных данных.

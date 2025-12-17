@@ -28,7 +28,7 @@ output-file: README.md
 # Практика 
 
 ## Установка и загрузка необходимых библиотек
-```
+```{r}
 library(dplyr)     
 library(tidyr)      
 library(jsonlite)  
@@ -38,309 +38,357 @@ library(stringr)
 ```
 
 ## Подготовка данных
-```
+
+```{r}
 dataset_url <- "https://storage.yandexcloud.net/iamcth-data/dataset.tar.gz"
 temp_archive <- "security_logs.tar.gz"
-
- download_result <- tryCatch({
-     download.file(dataset_url, temp_archive, mode = "wb", quiet = TRUE)
-     cat("✓ Архив успешно загружен\n")
- }, error = function(e) {
-     cat("✗ Ошибка при загрузке:", e$message, "\n")
-     stop("Не удалось загрузить данные")
- }
-
- download_result <- tryCatch({
-     download.file(dataset_url, temp_archive, mode = "wb", quiet = TRUE)
-     cat("✓ Архив успешно загружен\n")
- }, error = function(e) {
-     cat("✗ Ошибка при загрузке:", e$message, "\n")
-     stop("Не удалось загрузить данные")
- })
-✓ Архив успешно загружен
- 
- cat("Распаковка архива...\n")
-Распаковка архива...
- extract_dir <- "extracted_logs"
- dir.create(extract_dir, showWarnings = FALSE)
- untar(temp_archive, exdir = extract_dir)
- 
- cat("Обработка файла журналов:", basename(log_files[1]), "\n")
-Обработка файла журналов: caldera_attack_evals_round1_day1_2019-10-20201108.json 
- log_data <- tryCatch({
-     con <- file(log_files[1], "r")
-     data <- stream_in(con)
-     close(con)
-     cat(" Данные успешно импортированы\n")
-     data
- }, error = function(e) {
-     cat("✗ Ошибка при чтении JSON:", e$message, "\n")
-     cat("Попытка альтернативного метода загрузки...\n")
-     data <- read_lines(log_files[1]) %>%
-         paste(collapse = "") %>%
-         fromJSON()
-     data
- })
- Imported 101904 records. Simplifying...
- Данные успешно импортированы
+extract_dir <- "extracted_logs"
 ```
+
+## Загрузка архива
+```{r}
+download_result <- tryCatch({
+    download.file(dataset_url, temp_archive, mode = "wb", quiet = TRUE)
+    cat(" Архив успешно загружен\n")
+    TRUE
+}, error = function(e) {
+    cat(" Ошибка при загрузке:", e$message, "\n")
+    stop("Не удалось загрузить данные")
+})
+```
+
+## Распаковка архива
+```{r}
+tryCatch({
+    if (!dir.exists(extract_dir)) {
+        dir.create(extract_dir, showWarnings = FALSE)
+    }
+    untar(temp_archive, exdir = extract_dir)
+    cat(" Архив успешно распакован в", extract_dir, "\n")
+}, error = function(e) {
+    cat("Ошибка при распаковке:", e$message, "\n")
+    stop("Не удалось распаковать архив")
+})
+```
+
+## Поиск JSON файлов
+```{r}
+log_files <- list.files(extract_dir, pattern = "\\.json$", full.names = TRUE, recursive = TRUE)
+
+if (length(log_files) == 0) {
+    stop("В архиве не найдено JSON файлов")
+}
+
+cat("Найдено JSON файлов:", length(log_files), "\n")
+```
+
+## Обработка первого файла
+```{r}
+log_data <- tryCatch({
+    con <- file(log_files[1], "r")
+    data <- stream_in(con, verbose = FALSE)
+    close(con)
+    cat("Данные успешно импортированы через stream_in\n")
+    data
+}, error = function(e) {
+    cat("Ошибка при чтении через stream_in:", e$message, "\n")
+    cat("Попытка альтернативного метода загрузки...\n")
+    
+    tryCatch({
+        data <- readLines(log_files[1], warn = FALSE) %>%
+            paste(collapse = "") %>%
+            fromJSON()
+        cat(" Данные успешно импортированы через readLines + fromJSON\n")
+        data
+    }, error = function(e2) {
+        cat(" Ошибка при альтернативном чтении:", e2$message, "\n")
+        stop("Не удалось прочитать JSON файл")
+    })
+})
+```
+
 
 ## Загрузка справочника событий WINDOWS
-```
-reference_url <- "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/appendix-l--events-to-monitor"
-html_content <- read_html(reference_url)
-event_table <- html_table(html_content)[[1]]
+```{r}
+event_table <- data.frame() # пустой на случай ошибки
+
+try({
+    url <- "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/appendix-l--events-to-monitor"
+    page <- read_html(url)
+    tables <- html_table(page)
+    event_table <- tables[[1]]
+    names(event_table)[1:2] <- c("Event_ID", "Description")
+    cat("Загружено событий:", nrow(event_table), "\n")
+})
 ```
 
-## Привести датасеты в вид “аккуратных данных” преобразовать типы столбцов в соответствии с типом данных
-```
-flatten_data <- function(df) {
-  cat("Начало преобразования...\n")
-    result <- as_tibble(df)
-    for (col_name in names(result)) {
-    col_data <- result[[col_name]]
-    if (is.list(col_data) || is.data.frame(col_data)) {
-      cat("Раскрываем столбец:", col_name, "\n")
-      tryCatch({
-        if (is.list(col_data) && length(col_data) == 1 && is.data.frame(col_data[[1]])) {
-          nested_df <- col_data[[1]]
-        } else {
-          nested_df <- as.data.frame(col_data)
+## Простая функция для распрямления данных
+```{r}
+flatten_simple <- function(df) {
+    cat("Упрощаем данные...\n")
+    
+    result <- df
+    
+    for(col_name in names(result)) {
+        col_data <- result[[col_name]]
+        
+        if(is.list(col_data)) {
+            cat("  Обрабатываем:", col_name, "\n")
+            
+            try({
+                if(all(sapply(col_data, length) == 1)) {
+                    result[[col_name]] <- unlist(col_data)
+                } 
+                else if(is.data.frame(col_data[[1]])) {
+                    df_temp <- col_data[[1]]
+                    names(df_temp) <- paste(col_name, names(df_temp), sep = "_")
+                    
+                    result[[col_name]] <- NULL
+                    
+                    result <- bind_cols(result, df_temp)
+                }
+            })
         }
-        if (ncol(nested_df) > 0) {
-          colnames(nested_df) <- paste(col_name, colnames(nested_df), sep = "_")
-          result[[col_name]] <- NULL
-          result <- bind_cols(result, nested_df)
-          cat("Успешно раскрыто в", ncol(nested_df), "столбцов\n")
-        }
-      }, error = function(e) {
-        cat("Ошибка при раскрытии:", e$message, "\n")
-      })
     }
-  }
+    
+    return(result)
+}
 ```
-## Просмотрите общую структуру данных с помощью функции glimpse()
+
+##  Применяем к нашим данным
+```{r}
+tidy_data <- flatten_simple(log_data)
 ```
-> glimpse(tidy_data_simple)
-Rows: 101,904
-Columns: 20
-$ `@timestamp`         <chr> "2019-10-20T20:11:06.937Z", "2019-10-20T20:11:07.101Z", "2019-10-20T20:11:09.0…
-$ event_created        <chr> "2019-10-20T20:11:09.988Z", "2019-10-20T20:11:09.988Z", "2019-10-20T20:11:11.9…
-$ event_code           <int> 4703, 4673, 10, 10, 10, 10, 11, 10, 10, 10, 10, 7, 7, 7, 4689, 10, 5, 4703, 10…
-$ event_action         <chr> "Token Right Adjusted Events", "Sensitive Privilege Use", "Process accessed (r…
+
+## Преобразуем даты если есть
+```{r}
+if("@timestamp" %in% names(tidy_data)) {
+    tidy_data <- tidy_data %>%
+        mutate(
+            timestamp = as.POSIXct(`@timestamp`, 
+                                  format = "%Y-%m-%dT%H:%M:%OS", 
+                                  tz = "UTC"),
+            date = as.Date(timestamp),
+            hour = format(timestamp, "%H")
+        )
+    cat("\nДаты преобразованы\n")
+}
 ```
+
+## Ищем ID событий для соединения со справочником
+```{r}
+event_col <- NULL
+possible_names <- c("event_code", "event_id", "EventID", "event.id", "id")
+
+for(name in possible_names) {
+    if(name %in% names(tidy_data)) {
+        event_col <- name
+        break
+    }
+}
+
+if(!is.null(event_col)) {
+    cat("Найдена колонка событий:", event_col, "\n")
+    
+    tidy_data <- tidy_data %>%
+        mutate(event_id_num = as.numeric(.data[[event_col]]))
+    
+    if(nrow(event_table) > 0) {
+        event_table <- event_table %>%
+            mutate(Event_ID = as.numeric(Event_ID))
+        
+        tidy_data <- tidy_data %>%
+            left_join(event_table, by = c("event_id_num" = "Event_ID"))
+        
+        cat("Добавлены описания событий\n")
+    }
+}
+```
+
+## Проверка 
+```{r}
+glimpse(tidy_data)
+```
+
 
 # Анализ
 ## 1. Раскройте датафрейм избавившись от вложенных датафреймов. Для обнаружения таких можно использовать функцию dplyr::glimpse(), а для раскрытия вложенности – tidyr::unnest(). Обратите внимание, что при раскрытии теряются внешние названия колонок – это можно предотвратить если использовать параметр tidyr::unnest(..., names_sep = ).
 
 ### Какие колонки содержат вложенные датафреймы или списки
-```
-nested_columns <- list(
-  dataframes = character(),
-  lists = character(),
-  other_nested = character()
-)
+```{r}
+winlog_cols <- grep("^winlog", names(tidy_data), value = TRUE)
 
-for (col_name in names(tidy_data)) {
-  col_data <- tidy_data[[col_name]]
-  col_type <- class(col_data)[1]
-  
-  if (is.data.frame(col_data)) {
-    nested_columns$dataframes <- c(nested_columns$dataframes, col_name)
-    cat("   •", col_name, "→ вложенный датафрейм (", ncol(col_data), "столбцов)\n")
-  } else if (is.list(col_data) && !is.data.frame(col_data)) {
-    nested_columns$lists <- c(nested_columns$lists, col_name)
-    
-    if (length(col_data) > 0) {
-      first_elem <- col_data[[1]]
-      elem_type <- if (!is.null(first_elem)) class(first_elem)[1] else "NULL"
-      cat( col_name, "→ список элементов типа", elem_type, "\n")
-    } else {
-      cat( col_name, "→ пустой список\n")
-    }
-  } else if (col_type %in% c("tbl_df", "tbl", "data.table")) {
-    nested_columns$other_nested <- c(nested_columns$other_nested, col_name)
-    cat( col_name, "→ объект типа", col_type, "\n")
-  }
+for(col in winlog_cols) {
+    col_data <- tidy_data[[col]]
+    cat(col, "→ тип:", class(col_data)[1], 
+        " | длина:", if(is.list(col_data)) "список" else length(col_data), 
+        " | NAs:", sum(is.na(col_data)), "\n")
 }
-
-winlog_event_data → вложенный датафрейм ( 234 столбцов)
-   winlog_process → вложенный датафрейм ( 2 столбцов)
-   winlog_keywords → список элементов типа character 
-   winlog_user → вложенный датафрейм ( 4 столбцов)
-   winlog_user_data → вложенный датафрейм ( 30 столбцов)
-   
-cat("\nВсего вложенных структур:", 
-    length(nested_columns$dataframes) + 
-    length(nested_columns$lists) + 
-    length(nested_columns$other_nested), "\n")
-    
-Всего вложенных структур: 5 
 ```
 
 ### Раскроем вложенные датафреймы с помощью unnest()
-```
-unested_data <- tidy_data
+```{r}
+simple_data <- tidy_data
+cols_processed <- 0
 
-safe_unnest <- function(df, cols_to_unnest, names_sep = "_") {
-  result <- df
-  
-  for (col in cols_to_unnest) {
-    if (col %in% names(result)) {
-      cat("   Раскрываем колонку:", col, "\n")
-      
-      tryCatch({
-        result <- result %>%
-          tidyr::unnest(
-            cols = all_of(col),
-            names_sep = names_sep,
-            keep_empty = TRUE
-          )
-        cat(" Успешно раскрыто\n")
-      }, error = function(e) {
-        cat(" Ошибка:", e$message, "\n")
+for(col in names(simple_data)) {
+    if(is.data.frame(simple_data[[col]])) {
+        cat(col, "→ датафрейм → ")
         
-        if (is.data.frame(df[[col]])) {
-          nested_df <- as.data.frame(df[[col]])
-          
-          if (ncol(nested_df) > 0) {
-            colnames(nested_df) <- paste(col, colnames(nested_df), sep = names_sep)
+        nested_df <- simple_data[[col]]
+        
+        if(ncol(nested_df) > 0) {
+            new_names <- paste(col, colnames(nested_df), sep = "_")
+            colnames(nested_df) <- new_names
             
-            result[[col]] <- NULL
+            simple_data[[col]] <- NULL
+            simple_data <- bind_cols(simple_data, nested_df)
             
-            result <- bind_cols(result, nested_df)
-            cat("     ✓ Раскрыто в", ncol(nested_df), "столбцов\n")
-          }
+            cat("развернут в", ncol(nested_df), "колонок\n")
+            cols_processed <- cols_processed + 1
+        } else {
+            cat("пустой - удаляем\n")
+            simple_data[[col]] <- NULL
         }
-      })
     }
-  }
-  
-  return(result)
+    else if(is.list(simple_data[[col]]) && !is.vector(simple_data[[col]])) {
+        cat(col, "→ список → ")
+        
+        simple_data[[col]] <- sapply(simple_data[[col]], 
+            function(x) paste(x, collapse = "; "))
+        
+        cat("преобразован в текст\n")
+        cols_processed <- cols_processed + 1
+    }
 }
-
-if (length(nested_columns$dataframes) > 0) {
-  unested_data <- safe_unnest(unested_data, nested_columns$dataframes, names_sep = "_")
-} else {
-  cat("  Вложенные датафреймы не обнаружены\n")
-}
-Раскрываем колонку: winlog_event_data 
-      Успешно раскрыто
-   Раскрываем колонку: winlog_process 
-      Успешно раскрыто
-   Раскрываем колонку: winlog_user 
-      Успешно раскрыто
-   Раскрываем колонку: winlog_user_data 
-      Успешно раскрыто
-
 ```
 
 ### Раскрываем списки 
+
+```{r}
+unested_data <- tidy_data
 ```
-if (length(nested_columns$lists) > 0) {
-  for (list_col in nested_columns$lists) {
-    cat("   Обрабатываем список:", list_col, "\n")
-    
-    list_data <- unested_data[[list_col]]
-    
-    if (length(list_data) > 0 && !all(sapply(list_data, is.null))) {
-      tryCatch({
-        unested_data <- unested_data %>%
-          tidyr::unnest_wider(
-            cols = all_of(list_col),
-            names_sep = "_"
-          )
-        cat(" Список успешно раскрыт\n")
-      }, error = function(e) {
-        cat("  Не удалось раскрыть список:", e$message, "\n")
+
+```{r}
+list_cols <- names(unested_data)[sapply(unested_data, is.list)]
+cat("Списки для обработки:", paste(list_cols, collapse = ", "), "\n\n")
+
+for(col in list_cols) {
+  cat("Обрабатываем:", col, "\n")
+  
+  col_data <- unested_data[[col]]
+  
+  tryCatch({
+    if (all(sapply(col_data, length) == 1)) {
+      unested_data[[col]] <- unlist(col_data)
+      cat("  → преобразован в вектор\n")
+    } 
+    else {
+      unested_data[[col]] <- sapply(col_data, function(x) {
+        if (is.null(x)) return(NA)
         
-        cat("     Преобразуем в текстовый формат...\n")
-        unested_data[[list_col]] <- sapply(list_data, function(x) {
-          if (is.null(x)) NA_character_
-          else if (is.character(x)) paste(x, collapse = "; ")
-          else as.character(x)
-        })
+        if (!is.null(names(x))) {
+          parts <- paste(names(x), x, sep = "=")
+          return(paste(parts, collapse = "; "))
+        } else {
+          return(paste(x, collapse = "; "))
+        }
       })
-    } else {
-      cat(" Список пустой или содержит только NULL, удаляем...\n")
-      unested_data[[list_col]] <- NULL
+      cat(" преобразован в текст с именами\n")
     }
-  }
-} else {
-  cat("  Списков для обработки не обнаружено\n")
+  }, error = function(e) {
+    cat(" Ошибка:", e$message, "\n")
+    cat("  Пропускаем эту колонку\n")
+  })
 }
 
-cat(" Было столбцов:", ncol(tidy_data), "\n")
-   Было столбцов: 19 
-> cat(" Стало столбцов:", ncol(unested_data), "\n")
-   Стало столбцов: 285 
-> cat(" Добавлено столбцов:", ncol(unested_data) - ncol(tidy_data), "\n")
-   Добавлено столбцов: 266 
 ```
 
 ### Минимизируйте количество колонок в датафрейме – уберите колоки с единственным значением параметра.
+```{r}
+was_count <- ncol(unested_data)
 ```
+
+```{r}
 minimized_simple <- unested_data %>%
   select(where(~ n_distinct(., na.rm = TRUE) > 1))
+```
 
-cat("Осталось колонок:", ncol(minimized_simple), "\n")
-    Осталось колонок: 179
-cat("Удалено:", ncol(unested_data) - ncol(minimized_simple), "\n\n")
-    Удалено: 106 
+```{r}
+now_count <- ncol(minimized_simple)
+removed <- was_count - now_count
 ```
 
 ### Какое количество хостов представлено в данном датасете?
-```
-host_count <- tidy_data %>%
-     distinct(winlog_computer_name) %>%
-     nrow()
- 
- cat("Количество хостов:", host_count, "\n")
-Количество хостов: 5 
+```{r}
+if("winlog_SubjectDomainName" %in% names(minimized_simple)) {
+  domains <- unique(na.omit(minimized_simple$winlog_SubjectDomainName))
+  
+  domains <- domains[domains != "-" & domains != ""]
+  
+  cat("Уникальных доменов (хостов):", length(domains), "\n")
+  cat("Домены:\n")
+  print(domains)
+  
+  hosts_df <- data.frame(
+    Host_Count = length(domains),
+    Hosts = paste(domains, collapse = ", ")
+  )
+  
+  cat("\nРезультат:\n")
+  print(hosts_df)
+}
 ```
 
 ### Подготовьте датафрейм с расшифровкой Windows Event_ID, приведите типы данных к типу их значений.
+```{r}
+windows_event_df <- event_table
 ```
-suppressWarnings({
-+     windows_event_df <- event_table %>%
-+         rename(
-+             winlog_event_id = `Current Windows Event ID`,
-+             event_description = `Event Summary`
-+         ) %>%
-+         mutate(
-+             winlog_event_id = as.integer(winlog_event_id),
-+             event_description = as.character(event_description)
-+         )
-+ })
 
-> cat("✓ Справочник создан (предупреждение обработано)\n")
-✓ Справочник создан (предупреждение обработано)
-> cat("Событий:", nrow(windows_event_df), "\n")
-Событий: 381 
-> cat("Тип winlog_event_id:", class(windows_event_df$winlog_event_id), "\n")
-Тип winlog_event_id: integer 
+```{r}
+new_names <- c("winlog_event_id", "event_description")
+for(i in 1:min(2, ncol(windows_event_df))) {
+  names(windows_event_df)[i] <- new_names[i]
+}
+```
+
+```{r}
+if("winlog_event_id" %in% names(windows_event_df)) {
+  # Сначала в текст, потом в число
+  windows_event_df$winlog_event_id <- as.character(windows_event_df$winlog_event_id)
+  windows_event_df$winlog_event_id <- as.integer(windows_event_df$winlog_event_id)
+  cat("✓ winlog_event_id преобразован\n")
+}
+```
+
+```{r}
+if("event_description" %in% names(windows_event_df)) {
+  windows_event_df$event_description <- as.character(windows_event_df$event_description)
+  cat("✓ event_description преобразован\n")
+}
+```
+
+```{r}
+windows_event_df <- windows_event_df %>%
+  filter(!is.na(winlog_event_id)) %>%
+  distinct(winlog_event_id, .keep_all = TRUE)
+
+cat("\n✓ Справочник готов\n")
+cat("   Уникальных событий:", nrow(windows_event_df), "\n")
+```
+
+```{r}
+write.csv(windows_event_df, "windows_event_reference.csv", row.names = FALSE)
+cat("   Сохранен в windows_event_reference.csv\n")
 ```
 
 ### Есть ли в логе события с высоким и средним уровнем значимости? Сколько их?
-```
- cat("Уровни в данных:\n")
-Уровни в данных:
- print(table(tidy_data$log_level))
+```{r}
+print(table(log_data$log$level))
 
-      error information     verbose     warning 
-          4       78473       23205         222 
- cat("\n")
-
-
- high_count <- tidy_data %>% filter(log_level == "error") %>% nrow()
- medium_count <- tidy_data %>% filter(log_level == "warning") %>% nrow()
-
- cat("Событий высокого уровня (error):", high_count, "\n")
-Событий высокого уровня (error): 4 
- cat("Событий среднего уровня (warning):", medium_count, "\n")
-Событий среднего уровня (warning): 222 
- cat("Всего:", high_count + medium_count, "\n")
-Всего: 226 
+cat("\nСобытий с высоким уровнем (error):", sum(log_data$log$level == "error"))
+cat("\nСобытий со средним уровнем (warning):", sum(log_data$log$level == "warning"))
+cat("\nВсего high+medium:", sum(log_data$log$level %in% c("error", "warning")))
 ```
 
 # Оценка результатов

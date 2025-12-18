@@ -42,27 +42,27 @@ output-file: README.md
 
 ### Создание столбчатой диаграммы
 
-![](png/5.png)
+![](png/chart1.1)
 
-![](png/6.png)
+![](png/chasr1.2)
 
 ### Создание круговой диаграммы
 
-![](png/7.png)
+![](png/char2.1)
 
-![](png/8.png)
+![](png/charr2.2)
 
 ### Создание линейной диаграммы
 
-![](png/9.png)
+![](png/char3.1)
 
-![](png/10.png)
+![](png/char3.2)
 
 ## Шаг 4. Составляем дашборд
 
-![](png/11.png)
+![](png/dash)
 
-Ссылка на дашборд - https://datalens.ru/1l2ok32c5nnal-dashbord-dtoy
+[ссылка на дашборд](https://datalens.ru/1l2ok32c5nnal-dashbord-dtoy)
 
 # Оценка результата
 
